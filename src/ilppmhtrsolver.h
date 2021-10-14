@@ -51,6 +51,7 @@ public:
   /// @param bounds Upper bounds on mu, gamma and sigma
   /// @param forcedComigrations List of ordered pairs of anatomical sites
   /// that must be present
+  /// @param nrSolutions Number of solutions
   static IntTriple run(const CloneTree& T,
                        const std::string& primary,
                        const std::string& outputDirectory,
@@ -62,10 +63,12 @@ public:
                        bool outputSearchGraph,
                        int timeLimit,
                        const IntTriple& bounds,
-                       const StringPairList& forcedComigrations);
+                       const StringPairList& forcedComigrations,
+                       int nrSolutions);
   
   /// Return refined clone tree of provided solution index
-  virtual const CloneTree& T() const
+  /// @param solIdx Solution index
+  virtual const CloneTree& T(int soldIdx) const
   {
     return *_pTprime;
   }

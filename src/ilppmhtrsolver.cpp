@@ -827,7 +827,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                               bool outputSearchGraph,
                               int timeLimit,
                               const IntTriple& bounds,
-                              const StringPairList& forcedComigrations)
+                              const StringPairList& forcedComigrations,
+                              int nrSolutions)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -860,7 +861,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                            outputSearchGraph,
                            timeLimit,
                            bounds,
-                           forcedComigrations);
+                           forcedComigrations,
+                           nrSolutions);
 }
 
 void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,

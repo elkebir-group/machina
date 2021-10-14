@@ -182,7 +182,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
                             bool outputSearchGraph,
                             int timeLimit,
                             const IntTriple& bounds,
-                            const StringPairList& forcedComigrations)
+                            const StringPairList& forcedComigrations,
+                            int nrSolutions)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -214,7 +215,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
              outputSearchGraph,
              timeLimit,
              bounds,
-             forcedComigrations);
+             forcedComigrations,
+             nrSolutions);
 }
 
 IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
@@ -229,7 +231,8 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
                             bool outputSearchGraph,
                             int timeLimit,
                             const IntTriple& bounds,
-                            const StringPairList& forcedComigrations)
+                            const StringPairList& forcedComigrations,
+                            int nrSolutions)
 {
   char buf[1024];
   std::string filenameSearchGraph;
@@ -265,7 +268,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
   }
   
   lemon::Timer timer;
-  bool solved = solver.solve(nrThreads, timeLimit);
+  bool solved = solver.solve(nrThreads, timeLimit, nrSolutions);
   if (!solved)
   {
     std::cout << outputPrefix << "\t"
@@ -287,10 +290,11 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
     return res;
   }
 
-  MigrationGraph G(solver.T(), solver.lPlus());
+  int solIdx = 0;
+  MigrationGraph G(solver.T(solIdx), solver.lPlus(solIdx));
   
   int mu = G.getNrMigrations();
-  int gamma = G.getNrComigrations(solver.T(), solver.lPlus());
+  int gamma = G.getNrComigrations(solver.T(solIdx), solver.lPlus(solIdx));
   int sigma = G.getNrSeedingSites();
   
   std::cout << outputPrefix << "\t"
@@ -312,7 +316,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
              primary.c_str(),
              MigrationGraph::getPatternString(pattern).c_str());
     std::ofstream outT(buf);
-    solver.writeCloneTree(outT, colorMap);
+    solver.writeCloneTree(outT, colorMap, solIdx);
     outT.close();
     
     snprintf(buf, 1024, "%s/%sG-%s-%s.dot",
@@ -339,7 +343,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
              primary.c_str(),
              MigrationGraph::getPatternString(pattern).c_str());
     std::ofstream outTree(buf);
-    solver.T().write(outTree);
+    solver.T(solIdx).write(outTree);
     outTree.close();
     
     snprintf(buf, 1024, "%s/%sT-%s-%s.labeling",
@@ -348,7 +352,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
              primary.c_str(),
              MigrationGraph::getPatternString(pattern).c_str());
     std::ofstream outLabeling(buf);
-    solver.T().writeVertexLabeling(outLabeling, solver.lPlus());
+    solver.T(solIdx).writeVertexLabeling(outLabeling, solver.lPlus(solIdx));
     outLabeling.close();
     
     std::ofstream outGG(filenameSearchGraph.c_str());
@@ -514,7 +518,7 @@ void IlpPmhSolver::initConstraintsG()
   sum.clear();*/
 }
 
-bool IlpPmhSolver::solve(int nrThreads, int timeLimit)
+bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions)
 {
   try
   {
@@ -525,6 +529,11 @@ bool IlpPmhSolver::solve(int nrThreads, int timeLimit)
     if (timeLimit > 0)
     {
       _model.getEnv().set(GRB_DoubleParam_TimeLimit, timeLimit);
+    }
+    if (nrSolutions > 1)
+    {
+      _model.getEnv().set(GRB_IntParam_PoolSearchMode, 2);
+      _model.getEnv().set(GRB_IntParam_PoolSolutions, nrSolutions);
     }
     
     _model.getEnv().set(GRB_IntParam_LogToConsole, 0);
@@ -1455,7 +1464,8 @@ void IlpPmhSolver::processSolution()
 }
 
 void IlpPmhSolver::writeCloneTree(std::ostream& out,
-                                  const StringToIntMap& colorMap) const
+                                  const StringToIntMap& colorMap,
+                                  int solIdx) const
 {
-  T().writeDOT(out, lPlus(), colorMap);
+  T(solIdx).writeDOT(out, lPlus(solIdx), colorMap);
 }

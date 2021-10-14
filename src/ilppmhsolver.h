@@ -39,13 +39,15 @@ public:
   virtual ~IlpPmhSolver();
   
   /// Return clone tree
-  virtual const CloneTree& T() const
+  /// @param solIdx Solution index
+  virtual const CloneTree& T(int soldIdx) const
   {
     return _T;
   }
   
   /// Return vertex labeling
-  virtual const StringNodeMap& lPlus() const
+  /// /// @param solIdx Solution index
+  virtual const StringNodeMap& lPlus(int soldIdx) const
   {
     return *_pLPlus;
   }
@@ -54,7 +56,8 @@ public:
   ///
   /// @param nrThreads Number of threads
   /// @param timeLimit Time limit in seconds (-1: no time limit)
-  bool solve(int nrThreads, int timeLimit);
+  /// @param nrSolutions Number of solutions
+  bool solve(int nrThreads, int timeLimit, int nrSolutions);
   
   /// Export ILP model
   void exportModel(const std::string& filename);
@@ -81,8 +84,10 @@ public:
   ///
   /// @param out Output stream
   /// @param colorMap Color map
+  /// @param solIdx Solution index
   virtual void writeCloneTree(std::ostream& out,
-                              const StringToIntMap& colorMap) const;
+                              const StringToIntMap& colorMap,
+                              int solIdx) const;
   
   /// Return upper bound
   double UB() const
@@ -105,6 +110,7 @@ public:
   /// @param bounds Upper bounds on mu, gamma and sigma
   /// @param forcedComigrations List of ordered pairs of anatomical sites
   /// that must be present
+  /// @param nrSolutions Number of solutions
   static IntTriple run(const CloneTree& T,
                        const std::string& primary,
                        const std::string& outputDirectory,
@@ -116,7 +122,8 @@ public:
                        bool outputSearchGraph,
                        int timeLimit,
                        const IntTriple& bounds,
-                       const StringPairList& forcedComigrations);
+                       const StringPairList& forcedComigrations,
+                       int nrSolutions);
   
 protected:
   /// Initialize indices and mappings
@@ -251,6 +258,7 @@ protected:
   /// @param bounds Upper bounds on mu, gamma and sigma
   /// @param forcedComigrations List of ordered pairs of anatomical sites
   /// that must be present
+  /// @param nrSolutions Number of solutions
   static IntTriple run(IlpPmhSolver& solver,
                        const CloneTree& T,
                        const std::string& primary,
@@ -263,7 +271,8 @@ protected:
                        bool outputSearchGraph,
                        int timeLimit,
                        const IntTriple& bounds,
-                       const StringPairList& forcedComigrations);
+                       const StringPairList& forcedComigrations,
+                       int nrSolutions);
   
   /// Vector of node sets
   typedef std::vector<NodeSet> NodeSetVector;

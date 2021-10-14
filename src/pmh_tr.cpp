@@ -35,11 +35,13 @@ int main(int argc, char** argv)
   IntTriple bounds = std::make_pair(-1, std::make_pair(-1, -1));
   std::string migrationTreeFile;
   bool oldMode = false;
+  int nrSolutions = 1;
   
   lemon::ArgParser ap(argc, argv);
   ap.refOption("c", "Color map file", filenameColorMap, true)
     .other("T", "Clone tree")
     .other("leaf_labeling", "Leaf labeling")
+    .refOption("N", "Number of solutions (default: 1)", nrSolutions)
     .refOption("g", "Output search graph", outputSearchGraph)
     .refOption("log", "Gurobi logging", gurobiLog)
     .refOption("t", "Number of threads (default: -1, #cores)", nrThreads)
@@ -180,7 +182,8 @@ int main(int argc, char** argv)
                               outputSearchGraph,
                               timeLimit,
                               bounds,
-                              migrationTree);
+                              migrationTree,
+                              nrSolutions);
         }
         else
         {
@@ -214,7 +217,8 @@ int main(int argc, char** argv)
                             outputSearchGraph,
                             timeLimit,
                             bounds,
-                            StringPairList());
+                            StringPairList(),
+                            nrSolutions);
       }
       else
       {
