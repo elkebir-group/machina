@@ -25,8 +25,19 @@ IlpPmhTrSolver::IlpPmhTrSolver(const CloneTree& T,
 
 IlpPmhTrSolver::~IlpPmhTrSolver()
 {
-  delete _pNodeToStateSet;
-  delete _pNodeToRootState;
+  if (_pNodeToStateSet != NULL){
+    for (int i=0;i<anrSolutions; i++){
+      delete _pNodeToStateSet[i];
+    }
+    delete _pNodeToStateSet;
+  }
+  const int anrSolutions = _model.get(GRB_IntAttr_SolCount);
+  if (_pNodeToRootState != NULL){
+    for (int i=0;i<anrSolutions; i++){
+      delete _pNodeToRootState[i];
+    }
+    delete _pNodeToRootState;
+  }
   delete _pTprime;
   delete _pCallback;
 }
@@ -63,6 +74,7 @@ void IlpPmhTrSolver::initMultiSourceSeedingConstraints()
 
 void IlpPmhTrSolver::processSolution()
 {
+  const int anrSolutions = _model.get(GRB_IntAttr_SolCount);
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
   const int nrNodes = _indexToNode.size();
 //  const int nrArcs = _indexToArc.size();
@@ -143,13 +155,30 @@ void IlpPmhTrSolver::processSolution()
   //      }
   //    }
 
-  
-  constructGraph();
-  delete _pNodeToStateSet;
-  delete _pNodeToRootState;
-  _pNodeToStateSet = new IntPairSetNodeMap(getTree());
-  _pNodeToRootState = new IntPairNodeMap(getTree());
-  
+
+  if (_pNodeToStateSet != NULL){
+    for (int i=0;i<anrSolutions; i++){
+      delete _pNodeToStateSet[i];
+    }
+    delete _pNodeToStateSet;
+  }
+  if (_pNodeToRootState != NULL){
+    for (int i=0;i<anrSolutions; i++){
+      delete _pNodeToRootState[i];
+    }
+    delete _pNodeToRootState;
+  }
+
+  _pNodeToStateSet = new IntPairSetNodeMap*[anrSolutions];
+  _pNodeToRootState = new IntPairNodeMap*[anrSolutions];
+  _pTprime = new CloneTree*[anrSolutions];
+  _pLPlus = new StringNodeMap*[anrSolutions];
+
+  for(int nSoln=0; nSoln<anrSolutions; nSoln++){
+    _model.set(GRB_IntParam_SolutionNumber, nSoln);
+    constructGraph();
+    _pNodeToStateSet[nSoln] = new IntPairSetNodeMap(getTree());
+    _pNodeToRootState[nSoln] = new IntPairNodeMap(getTree());
 //  for (int s = 0; s < nrAnatomicalSites; ++s)
 //  {
 //    for (int t = 0; t < nrAnatomicalSites; ++t)
@@ -169,70 +198,71 @@ void IlpPmhTrSolver::processSolution()
 //    }
 //  }
   
-  for (int i = 0; i < nrNodes; ++i)
-  {
-    Node v_i = _indexToNode[i];
-    for (int s = 0; s < nrAnatomicalSites; ++s)
+    for (int i = 0; i < nrNodes; ++i)
     {
-      int size_L_s = _L[s].size();
-      for (int c = 0; c < size_L_s; ++c)
+      Node v_i = _indexToNode[i];
+      for (int s = 0; s < nrAnatomicalSites; ++s)
       {
-        if (_r[i][s][c].get(GRB_DoubleAttr_X) >= 0.4)
+        int size_L_s = _L[s].size();
+        for (int c = 0; c < size_L_s; ++c)
         {
-//          std::cout << _r[i][s][c].get(GRB_StringAttr_VarName)
-//                    << " = " << _r[i][s][c].get(GRB_DoubleAttr_X) << std::endl;
-          (*_pNodeToRootState)[v_i] = std::make_pair(s, c);
+          if (_r[i][s][c].get(GRB_DoubleAttr_Xn) >= 0.4)
+          {
+            //if(nSoln !=1) std::cout << nSoln<<" " << i << ' ' << s<<' '<<c<<' '
+            //          << " = " << _r[i][s][c].get(GRB_DoubleAttr_Xn) << std::endl;
+            (*_pNodeToRootState[nSoln])[v_i] = std::make_pair(s, c);
+          }
         }
       }
     }
-  }
-  
-  for (int i = 0; i < nrNodes; ++i)
-  {
-    Node v_i = _indexToNode[i];
-    for (int s = 0; s < nrAnatomicalSites; ++s)
-    {
-      int size_L_s = _L[s].size();
-      for (int c = 0; c < size_L_s; ++c)
-      {
-        if (_x[i][s][c].get(GRB_DoubleAttr_X) >= 0.4)
-        {
-//          std::cout << _x[i][s][c].get(GRB_StringAttr_VarName)
-//                    << " = " << _x[i][s][c].get(GRB_DoubleAttr_X) << std::endl;
-          (*_pNodeToStateSet)[v_i].insert(std::make_pair(s, c));
-        }
-      }
-    }
-  }
     
-//  for (int ij = 0; ij < nrArcs; ++ij)
-//  {
-//    Arc a_ij = _indexToArc[ij];
-//
-//    for (int s = 0; s < nrAnatomicalSites; ++s)
-//    {
-//      int size_L_s = _L[s].size();
-//      for (int c = 0; c < size_L_s; ++c)
-//      {
-//        for (int t = 0; t < nrAnatomicalSites; ++t)
-//        {
-//          int size_L_t = _L[t].size();
-//          for (int d = 0; d < size_L_t; ++d)
-//          {
-//            if (_xx[ij][s][c][t][d].get(GRB_DoubleAttr_X) >= 0.4)
-//            {
-//              std::cout << _xx[ij][s][c][t][d].get(GRB_StringAttr_VarName)
-//              << " = " << _xx[ij][s][c][t][d].get(GRB_DoubleAttr_X) << std::endl;
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
-  
-  BoolNodeMap leafPresence(getTree(), true);
-  StringToStringMap toMutLabel;
-  refine(leafPresence, toMutLabel);
+    for (int i = 0; i < nrNodes; ++i)
+    {
+      Node v_i = _indexToNode[i];
+      for (int s = 0; s < nrAnatomicalSites; ++s)
+      {
+        int size_L_s = _L[s].size();
+        for (int c = 0; c < size_L_s; ++c)
+        {
+          if (_x[i][s][c].get(GRB_DoubleAttr_Xn) >= 0.4)
+          {
+  //          std::cout << _x[i][s][c].get(GRB_StringAttr_VarName)
+  //                    << " = " << _x[i][s][c].get(GRB_DoubleAttr_X) << std::endl;
+            (*_pNodeToStateSet[nSoln])[v_i].insert(std::make_pair(s, c));
+          }
+        }
+      }
+    }
+      
+  //  for (int ij = 0; ij < nrArcs; ++ij)
+  //  {
+  //    Arc a_ij = _indexToArc[ij];
+  //
+  //    for (int s = 0; s < nrAnatomicalSites; ++s)
+  //    {
+  //      int size_L_s = _L[s].size();
+  //      for (int c = 0; c < size_L_s; ++c)
+  //      {
+  //        for (int t = 0; t < nrAnatomicalSites; ++t)
+  //        {
+  //          int size_L_t = _L[t].size();
+  //          for (int d = 0; d < size_L_t; ++d)
+  //          {
+  //            if (_xx[ij][s][c][t][d].get(GRB_DoubleAttr_X) >= 0.4)
+  //            {
+  //              std::cout << _xx[ij][s][c][t][d].get(GRB_StringAttr_VarName)
+  //              << " = " << _xx[ij][s][c][t][d].get(GRB_DoubleAttr_X) << std::endl;
+  //            }
+  //          }
+  //        }
+  //      }
+  //    }
+  //  }
+    
+    BoolNodeMap leafPresence(getTree(), true);
+    StringToStringMap toMutLabel;
+    refine(leafPresence, toMutLabel, nSoln);
+  }
 }
 
 void IlpPmhTrSolver::initVariables()
@@ -866,7 +896,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
 }
 
 void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
-                            StringToStringMap& toMutLabel)
+                            StringToStringMap& toMutLabel,
+                            int solIdx)
 {
   // 1. refine
   Digraph Tprime;
@@ -877,17 +908,17 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
   toMutLabel[label[root_Tprime]] = getLabel(getRoot());
   lPlus[root_Tprime] = _indexToAnatomicalSite[_primaryIndex];
   
-  refine(leafPresence, toMutLabel, getRoot(), Tprime, root_Tprime, label, lPlus);
+  refine(leafPresence, toMutLabel, getRoot(), Tprime, root_Tprime, label, lPlus, solIdx);
   
   // 2. construct clone tree
-  _pTprime = new CloneTree(Tprime, root_Tprime, label, lPlus);
-  _pLPlus = new StringNodeMap(_pTprime->tree());
+  _pTprime[solIdx] = new CloneTree(Tprime, root_Tprime, label, lPlus);
+  _pLPlus[solIdx] = new StringNodeMap(_pTprime[solIdx]->tree());
   
   for (NodeIt v(Tprime); v != lemon::INVALID; ++v)
   {
     const std::string& label_v = label[v];
-    Node vv = _pTprime->getNodeByLabel(label_v);
-    _pLPlus->set(vv, lPlus[v]);
+    Node vv = _pTprime[solIdx]->getNodeByLabel(label_v);
+    _pLPlus[solIdx]->set(vv, lPlus[v]);
   }
 }
 
@@ -983,9 +1014,10 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
                             Digraph& Tprime,
                             Node uu, //Node v_inTprime,
                             StringNodeMap& label,
-                            StringNodeMap& lPlus)
+                            StringNodeMap& lPlus,
+                            int solIdx)
 {
-  const IntPairSet& Sigma_u = (*_pNodeToStateSet)[u];
+  const IntPairSet& Sigma_u = (*_pNodeToStateSet[solIdx])[u];
   if (Sigma_u.size() <= 1)
   {
     // leave vertex u unperturbed
@@ -1019,7 +1051,7 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
         label[vv] = getLabel(v);
         assert(toMutLabel.count(label[vv]) == 0);
         toMutLabel[label[vv]] = getLabel(v);
-        refine(leafPresence, toMutLabel, v, Tprime, vv, label, lPlus);
+        refine(leafPresence, toMutLabel, v, Tprime, vv, label, lPlus, solIdx);
       }
     }
   }
@@ -1092,7 +1124,7 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
     for (OutArcIt a(getTree(), u); a != lemon::INVALID; ++a)
     {
       Node v = getTree().target(a);
-      const IntPair& td = (*_pNodeToRootState)[v];
+      const IntPair& td = (*_pNodeToRootState[solIdx])[v];
       
       if (!leafPresence[v])
         continue;
@@ -1117,7 +1149,7 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
       
       assert(toMutLabel.count(label[vv]) == 0);
       toMutLabel[label[vv]] = getLabel(v);
-      refine(leafPresence, toMutLabel, v, Tprime, vv, label, lPlus);
+      refine(leafPresence, toMutLabel, v, Tprime, vv, label, lPlus, solIdx);
     }
   }
 }

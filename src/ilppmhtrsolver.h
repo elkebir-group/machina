@@ -70,7 +70,7 @@ public:
   /// @param solIdx Solution index
   virtual const CloneTree& T(int soldIdx) const
   {
-    return *_pTprime;
+    return *_pTprime[soldIdx];
   }
   
 protected:
@@ -111,7 +111,8 @@ protected:
   
   /// Refine clone tree according to identified _G
   void refine(const BoolNodeMap& leafPresence,
-              StringToStringMap& toMutLabel);
+              StringToStringMap& toMutLabel,
+              int solIdx);
   
   /// Refine clone tree
   void refine(const BoolNodeMap& leafPresence,
@@ -120,7 +121,8 @@ protected:
               Digraph& Tprime,
               Node v_inTprime,
               StringNodeMap& label,
-              StringNodeMap& lPlus);
+              StringNodeMap& lPlus,
+              int solIdx);
   
   /// Check whether Sigma_u induces a connected subgraph of G
   ///
@@ -150,11 +152,11 @@ protected:
   
 protected:
   /// Vertex of T to set of states in color
-  IntPairSetNodeMap* _pNodeToStateSet;
+  IntPairSetNodeMap** _pNodeToStateSet;
   /// Vertex of T to root color
-  IntPairNodeMap* _pNodeToRootState;
+  IntPairNodeMap** _pNodeToRootState;
   /// Refined clone tree
-  CloneTree* _pTprime;
+  CloneTree** _pTprime;
   /// _z[i][s][c][t][d]
   Var5Matrix _zz;
   /// _r[i][s][c], root color

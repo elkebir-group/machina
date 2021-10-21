@@ -49,7 +49,7 @@ public:
   /// /// @param solIdx Solution index
   virtual const StringNodeMap& lPlus(int soldIdx) const
   {
-    return *_pLPlus;
+    return *_pLPlus[soldIdx];
   }
   
   /// Solve ILP
@@ -356,7 +356,8 @@ protected:
   /// Sub label to node
   NodeMatrix _subLabelToNodeG;
   /// Resulting vertex labeling
-  StringNodeMap* _pLPlus;
+  StringNodeMap** _pLPlus;
+  int anrSolutions;
 };
 
 #endif // ILPPMHSOLVER_H
