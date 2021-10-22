@@ -123,7 +123,8 @@ public:
                        int timeLimit,
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
-                       int nrSolutions);
+                       int nrSolutions,
+                       bool post_processing);
   
 protected:
   /// Initialize indices and mappings
@@ -272,7 +273,8 @@ protected:
                        int timeLimit,
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
-                       int nrSolutions);
+                       int nrSolutions,
+                       bool post_processing);
   
   /// Vector of node sets
   typedef std::vector<NodeSet> NodeSetVector;

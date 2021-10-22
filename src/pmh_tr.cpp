@@ -36,6 +36,7 @@ int main(int argc, char** argv)
   std::string migrationTreeFile;
   bool oldMode = false;
   int nrSolutions = 1;
+  bool post_processing = false;
   
   lemon::ArgParser ap(argc, argv);
   ap.refOption("c", "Color map file", filenameColorMap, true)
@@ -60,7 +61,8 @@ int main(int argc, char** argv)
     .refOption("UB_mu", "Upper bound on the migration number (default: -1, disabled)", bounds.first)
     .refOption("UB_gamma", "Upper bound on the comigration number (default: -1, disabled)", bounds.second.first)
     .refOption("UB_sigma", "Upper bound on the seeding site number (default: -1, disabled)", bounds.second.second)
-    .refOption("l", "Time limit in seconds (default: -1, no time limit)", timeLimit);
+    .refOption("l", "Time limit in seconds (default: -1, no time limit)", timeLimit)
+    .refOption("P", "Enable post processing (default: False)", post_processing);
   ap.parse();
   
   if (ap.files().size() != 2)
@@ -183,7 +185,8 @@ int main(int argc, char** argv)
                               timeLimit,
                               bounds,
                               migrationTree,
-                              nrSolutions);
+                              nrSolutions,
+                              post_processing);
         }
         else
         {
@@ -218,7 +221,8 @@ int main(int argc, char** argv)
                             timeLimit,
                             bounds,
                             StringPairList(),
-                            nrSolutions);
+                            nrSolutions,
+                            post_processing);
       }
       else
       {

@@ -183,7 +183,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
                             int timeLimit,
                             const IntTriple& bounds,
                             const StringPairList& forcedComigrations,
-                            int nrSolutions)
+                            int nrSolutions,
+                            bool post_processing)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -216,7 +217,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
              timeLimit,
              bounds,
              forcedComigrations,
-             nrSolutions);
+             nrSolutions,
+             post_processing);
 }
 
 IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
@@ -232,7 +234,8 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
                             int timeLimit,
                             const IntTriple& bounds,
                             const StringPairList& forcedComigrations,
-                            int nrSolutions)
+                            int nrSolutions,
+                            bool post_processing)
 {
   char buf[1024];
   std::string filenameSearchGraph;
@@ -290,12 +293,34 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
     return res;
   }
   
+  std::set<std::set<std::tuple<std::string, std::string, int>>> all_trees;
+  int pad_soln = std::log(nrSolutions);
+
   for (int solIdx = 0; solIdx < solver.anrSolutions; solIdx++){
     MigrationGraph G(solver.T(solIdx), solver.lPlus(solIdx));
     
     int mu = G.getNrMigrations();
     int gamma = G.getNrComigrations(solver.T(solIdx), solver.lPlus(solIdx));
     int sigma = G.getNrSeedingSites();
+
+    if(post_processing){
+      std::set<std::tuple<std::string, std::string, int>> tree_as_set;
+      for (NodeIt u(solver.T(solIdx).tree()); u != lemon::INVALID; ++u)
+      {
+        //std::cout << solver.T(solIdx).getLabelMap()[u] << " " << solver.lPlus(solIdx)[u] << std::endl;
+        tree_as_set.insert(std::make_tuple(solver.T(solIdx).getLabelMap()[u], solver.lPlus(solIdx)[u], 
+                  lemon::countOutArcs(solver.T(solIdx).tree(), u)));
+      }
+      /**std::cout<<"\n"<<solIdx<<' ';
+      for (auto it = tree_as_set.begin(); it !=tree_as_set.end(); ++it)
+          std::cout << "(" << std::get<0>((*it))<<','<<std::get<1>((*it))<<','<<std::get<2>((*it))<<") ";
+          **/
+      if(all_trees.find(tree_as_set) != all_trees.end()){
+        continue;
+      } else{
+        all_trees.insert(tree_as_set);
+      }
+    }
     
     std::cout << outputPrefix << "\t"
               << "(" << MigrationGraph::getAllowedPatternsString(pattern) << ")\t"
@@ -311,52 +336,52 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
     
     if (!outputDirectory.empty())
     {
-      snprintf(buf, 1024, "%s/%sT-%s-%s-%02d.dot",
+      snprintf(buf, 1024, "%s/%sT-%s-%s-%0*d.dot",
               outputDirectory.c_str(),
               outputPrefix.c_str(),
               primary.c_str(),
               MigrationGraph::getPatternString(pattern).c_str(),
-              solIdx);
+              pad_soln, solIdx);
       std::ofstream outT(buf);
       solver.writeCloneTree(outT, colorMap, solIdx);
       outT.close();
       
-      snprintf(buf, 1024, "%s/%sG-%s-%s-%02d.dot",
+      snprintf(buf, 1024, "%s/%sG-%s-%s-%0*d.dot",
               outputDirectory.c_str(),
               outputPrefix.c_str(),
               primary.c_str(),
               MigrationGraph::getPatternString(pattern).c_str(),
-              solIdx);
+              pad_soln, solIdx);
       std::ofstream outG(buf);
       G.writeDOT(outG, colorMap);
       outG.close();
 
-      snprintf(buf, 1024, "%s/%sG-%s-%s-%02d.tree",
+      snprintf(buf, 1024, "%s/%sG-%s-%s-%0*d.tree",
               outputDirectory.c_str(),
               outputPrefix.c_str(),
               primary.c_str(),
               MigrationGraph::getPatternString(pattern).c_str(),
-              solIdx);
+              pad_soln, solIdx);
       std::ofstream outGraph(buf);
       G.write(outGraph);
       outGraph.close();
       
-      snprintf(buf, 1024, "%s/%sT-%s-%s-%02d.tree",
+      snprintf(buf, 1024, "%s/%sT-%s-%s-%0*d.tree",
               outputDirectory.c_str(),
               outputPrefix.c_str(),
               primary.c_str(),
               MigrationGraph::getPatternString(pattern).c_str(),
-              solIdx);
+              pad_soln, solIdx);
       std::ofstream outTree(buf);
       solver.T(solIdx).write(outTree);
       outTree.close();
       
-      snprintf(buf, 1024, "%s/%sT-%s-%s-%02d.labeling",
+      snprintf(buf, 1024, "%s/%sT-%s-%s-%0*d.labeling",
               outputDirectory.c_str(),
               outputPrefix.c_str(),
               primary.c_str(),
               MigrationGraph::getPatternString(pattern).c_str(),
-              solIdx);
+              pad_soln, solIdx);
       std::ofstream outLabeling(buf);
       solver.T(solIdx).writeVertexLabeling(outLabeling, solver.lPlus(solIdx));
       outLabeling.close();
@@ -873,6 +898,7 @@ void IlpPmhSolver::initConstraints()
           sum += _x[i][s][c - 1];
           sum2 += _x[i][s][c];
           //std::cout << _x[i][s][c - 1].get(GRB_StringAttr_VarName) << "    " << _x[i][s][c].get(GRB_StringAttr_VarName) << std::endl;
+          //_model.addConstr(_x[i][s][c] <= _x[i][s][c - 1]);
         }
       }
       _model.addConstr(sum2 <= sum);
@@ -1391,7 +1417,7 @@ void IlpPmhSolver::processSolution()
 {
   const int nrNodes = _indexToNode.size();
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
-  
+
   _pLPlus = new StringNodeMap*[anrSolutions];
 
   for(int nSoln=0; nSoln<anrSolutions; nSoln++){

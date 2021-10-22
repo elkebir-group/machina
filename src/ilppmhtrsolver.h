@@ -64,7 +64,8 @@ public:
                        int timeLimit,
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
-                       int nrSolutions);
+                       int nrSolutions,
+                       bool post_processing);
   
   /// Return refined clone tree of provided solution index
   /// @param solIdx Solution index

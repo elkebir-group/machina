@@ -77,6 +77,57 @@ void IlpPmhTrSolver::processSolution()
   const int anrSolutions = _model.get(GRB_IntAttr_SolCount);
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
   const int nrNodes = _indexToNode.size();
+  
+  /**_model.set(GRB_IntParam_SolutionNumber, 2);
+  for(int s = 0; s < nrAnatomicalSites; ++s){
+    int size_L_s = _L[s].size();
+    for (int c = 0; c < size_L_s; ++c){
+      for(int t = 0; t < nrAnatomicalSites; ++t){
+        int size_L_t = _L[t].size();
+        for (int d = 0; d < size_L_t; ++d){
+          std::cout << s<<' '<<c<<' '<<t<<' '<<d << ' ' << _z[s][c][t][d].get(GRB_DoubleAttr_Xn)<<'\n';
+        }
+      }
+    }
+  }
+
+  _model.set(GRB_IntParam_SolutionNumber, 3);
+  for(int s = 0; s < nrAnatomicalSites; ++s){
+    int size_L_s = _L[s].size();
+    for (int c = 0; c < size_L_s; ++c){
+      for(int t = 0; t < nrAnatomicalSites; ++t){
+        int size_L_t = _L[t].size();
+        for (int d = 0; d < size_L_t; ++d){
+          std::cout << s<<' '<<c<<' '<<t<<' '<<d << ' ' << _z[s][c][t][d].get(GRB_DoubleAttr_Xn)<<'\n';
+        }
+      }
+    }
+  }
+  std::cout << nrAnatomicalSites<<' '<<nrNodes<<std::endl;
+  for (int i=0;i<nrNodes;i++){
+    for(int s=0;s<nrAnatomicalSites;s++){
+      int size_L_s = _L[s].size();
+      for (int c=0;c<size_L_s;c++){
+        _model.set(GRB_IntParam_SolutionNumber, 2);
+        int p= _x[i][s][c].get(GRB_DoubleAttr_Xn);
+        int r= _r[i][s][c].get(GRB_DoubleAttr_Xn);
+        _model.set(GRB_IntParam_SolutionNumber, 3);
+        //if (p!= _x[i][s][c].get(GRB_DoubleAttr_Xn) || r!= _r[i][s][c].get(GRB_DoubleAttr_Xn)){
+          std::cout <<i<< isLeaf(_indexToNode[i]) << ' '<<s<< ' '<<c<< ' '<<p<<' '<< _x[i][s][c].get(GRB_DoubleAttr_Xn)<<
+          ' '<<r<<' '<< _r[i][s][c].get(GRB_DoubleAttr_Xn)<<std::endl;
+        //}
+      }
+    }
+  }**/
+  /**for (int i=0;i<nrNodes;i++){
+    std::cout<<isLeaf(_indexToNode[i])<<'\n';
+  }for (int s=0;s<nrAnatomicalSites;s++){
+    std::cout<<s<<'s';
+    for (Node c:_L[s]){
+        std::cout << (*_pNodeToIndex)[c]<<' ';
+      }std::cout <<'\n';
+  }**/
+
 //  const int nrArcs = _indexToArc.size();
 
 //  for (int i = 0; i < nrNodes; ++i)
@@ -858,7 +909,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                               int timeLimit,
                               const IntTriple& bounds,
                               const StringPairList& forcedComigrations,
-                              int nrSolutions)
+                              int nrSolutions,
+                              bool post_processing)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -892,7 +944,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                            timeLimit,
                            bounds,
                            forcedComigrations,
-                           nrSolutions);
+                           nrSolutions,
+                           post_processing);
 }
 
 void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
@@ -1032,7 +1085,7 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
         if (Sigma_u.empty())
         {
           Node pi_uu = Tprime.source(InArcIt(Tprime, uu));
-          lPlus[uu] = lPlus[pi_uu];
+          lPlus[uu] = lPlus[pi_uu];std::cout <<"does it happen?";
         }
         else
         {
