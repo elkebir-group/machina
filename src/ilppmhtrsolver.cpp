@@ -7,6 +7,7 @@
 
 #include "ilppmhtrsolver.h"
 #include <lemon/time_measure.h>
+#include <queue>
 
 IlpPmhTrSolver::IlpPmhTrSolver(const CloneTree& T,
                                const std::string& primary,
@@ -72,7 +73,7 @@ void IlpPmhTrSolver::initMultiSourceSeedingConstraints()
   }
 }
 
-void IlpPmhTrSolver::processSolution()
+void IlpPmhTrSolver::processSolution(bool post_processing)
 {
   const int anrSolutions = _model.get(GRB_IntAttr_SolCount);
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
@@ -312,7 +313,7 @@ void IlpPmhTrSolver::processSolution()
     
     BoolNodeMap leafPresence(getTree(), true);
     StringToStringMap toMutLabel;
-    refine(leafPresence, toMutLabel, nSoln);
+    refine(leafPresence, toMutLabel, nSoln, post_processing);
   }
 }
 
@@ -950,7 +951,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
 
 void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
                             StringToStringMap& toMutLabel,
-                            int solIdx)
+                            int solIdx,
+                            bool post_processing)
 {
   // 1. refine
   Digraph Tprime;
@@ -962,6 +964,29 @@ void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,
   lPlus[root_Tprime] = _indexToAnatomicalSite[_primaryIndex];
   
   refine(leafPresence, toMutLabel, getRoot(), Tprime, root_Tprime, label, lPlus, solIdx);
+  
+  if(post_processing){
+    std::queue<Node> q;
+    q.push(root_Tprime);
+    while(!q.empty()){
+      Node curr = q.front();
+      q.pop();
+      for(OutArcIt p(Tprime, curr); p != lemon::INVALID; ++p){
+        Node child = Tprime.target(p);
+        if (label[child].find('^') != std::string::npos && lemon::countOutArcs(Tprime, child) == 1){
+          for(OutArcIt m(Tprime, child); m != lemon::INVALID; ++m){
+            Node gchild = Tprime.target(m);
+            Tprime.addArc(curr, gchild);
+            q.push(gchild);
+          }
+          Tprime.erase(child);
+        } else {
+          q.push(child);
+        }
+      }
+    }
+  }
+  
   
   // 2. construct clone tree
   _pTprime[solIdx] = new CloneTree(Tprime, root_Tprime, label, lPlus);

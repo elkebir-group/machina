@@ -108,12 +108,13 @@ protected:
   virtual GRBLinExpr initObjective(const IntTriple& bounds);
   
   /// Process ILP solution
-  virtual void processSolution();
+  virtual void processSolution(bool post_processing);
   
   /// Refine clone tree according to identified _G
   void refine(const BoolNodeMap& leafPresence,
               StringToStringMap& toMutLabel,
-              int solIdx);
+              int solIdx,
+              bool post_processing);
   
   /// Refine clone tree
   void refine(const BoolNodeMap& leafPresence,

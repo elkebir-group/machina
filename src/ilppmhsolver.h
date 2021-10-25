@@ -57,7 +57,7 @@ public:
   /// @param nrThreads Number of threads
   /// @param timeLimit Time limit in seconds (-1: no time limit)
   /// @param nrSolutions Number of solutions
-  bool solve(int nrThreads, int timeLimit, int nrSolutions);
+  bool solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing);
   
   /// Export ILP model
   void exportModel(const std::string& filename);
@@ -172,7 +172,7 @@ protected:
   virtual GRBLinExpr initObjective(const IntTriple& bounds);
   
   /// Process ILP solution
-  virtual void processSolution();
+  virtual void processSolution(bool post_processing);
   
   /// Return underlying tree
   virtual const Digraph& getTree() const

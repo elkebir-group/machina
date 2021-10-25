@@ -271,7 +271,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
   }
   
   lemon::Timer timer;
-  bool solved = solver.solve(nrThreads, timeLimit, nrSolutions);
+  bool solved = solver.solve(nrThreads, timeLimit, nrSolutions, post_processing);
   if (!solved)
   {
     std::cout << outputPrefix << "\t"
@@ -549,7 +549,7 @@ void IlpPmhSolver::initConstraintsG()
   sum.clear();*/
 }
 
-bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions)
+bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing)
 {
   try
   {
@@ -584,7 +584,7 @@ bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions)
       _LB = _model.get(GRB_DoubleAttr_ObjBound);
       _UB = _model.get(GRB_DoubleAttr_ObjVal);
       anrSolutions = _model.get(GRB_IntAttr_SolCount);
-      processSolution();
+      processSolution(post_processing);
       return true;
     }
     else if (status == GRB_INF_OR_UNBD)
@@ -611,7 +611,7 @@ bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions)
       anrSolutions = _model.get(GRB_IntAttr_SolCount);
       if (_UB < std::numeric_limits<double>::max() && _UB != NAN)
       {
-        processSolution();
+        processSolution(post_processing);
         return true;
       }
       return false;
@@ -1413,7 +1413,7 @@ void IlpPmhSolver::writeSolutionGraphDOT(std::ostream& out,
   out << "}";
 }
 
-void IlpPmhSolver::processSolution()
+void IlpPmhSolver::processSolution(bool post_processing)
 {
   const int nrNodes = _indexToNode.size();
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();

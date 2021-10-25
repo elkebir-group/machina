@@ -39,3 +39,5 @@ build2/
 
 # Mac stuff
 .DS_store
+.vscode
+
