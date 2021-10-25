@@ -294,7 +294,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
   }
   
   std::set<std::set<std::tuple<std::string, std::string, int>>> all_trees;
-  int pad_soln = std::log(nrSolutions);
+  int pad_soln = std::log10(nrSolutions) + 1;
 
   for (int solIdx = 0; solIdx < solver.anrSolutions; solIdx++){
     MigrationGraph G(solver.T(solIdx), solver.lPlus(solIdx));
