@@ -22,6 +22,7 @@ MACHINA is a computational framework for inferring migration patterns between a 
 ## Installation 
 
 <a name="bioconda"></a>
+
 ### bioconda
 1. Install [Anaconda](https://docs.anaconda.com/anaconda/install/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you do not already have one installed.
 2. (recommended) Create a new conda environment for `machina` and activate it:
@@ -41,12 +42,14 @@ conda install machina
 ```
 
 <a name="compilation"></a>
+
 ### Manual compilation
 *Note that binaries for macOS and linux are available [here](https://github.com/raphael-group/machina/releases). These binaries require a valid Gurobi installation and license key. License key location can be specified via the environment variable GRB_LICENSE_KEY. In addition, installation of Gurobi in a non-standard location will require updating LD_LIBRARY_PATH (linux) and DYLD_LIBRARY_PATH (macOS).*
 
 Also note that to run the below examples, you must either provide the full path to the executable (e.g., `/path/to/machina/build/pmh_sankoff`) or add the `build` directory to your PATH.
 
 <a name="dep"></a>
+
 #### Dependencies
 
 MACHINA is written in C++11 and thus requires a modern C++ compiler (GCC >= 4.8.1, or Clang). In addition, MACHINA has the following dependencies.
@@ -288,12 +291,14 @@ Each line lists the solution found by MACHINA. First the primary anatomical site
 <a name="pmh_tr"></a>
 ### Parsimonious Migration History with Tree Resolution (`pmh_tr`)
 
-In the parsimonious migration history with polytomy resolution we are given a clone tree `T` whose leaves are labeled by anatomical sites. The task is to find a refinement `T'` of `T` and label its inner vertices of such that the resulting migration graph `G` has minimum migration number, comigration number and seeding site number. It is possible to specify constraints on the topology of the migration graph.
+In the parsimonious migration history with polytomy resolution we are given a clone tree `T` whose leaves are labeled by anatomical sites. The task is to find a refinement `T'` of `T` and label its inner vertices such that the resulting migration graph `G` has minimum migration number, comigration number and seeding site number. It is possible to specify constraints on the topology of the migration graph. 
+
+**(New)** - Now it can enumerate through multiple optimal/sub-optimal solutions. the flag `-N` can be used to specify the number of solutions to fetch. One problem is that `pmh_tr` outputs multiple identical trees when their internal representation inside `pmh_tr` is different. To remove such duplicate trees, `-P` flag can be used.
 
     Usage:
       pmh_tr [--help|-h|-help] [-G str] [-OLD] [-UB_gamma int] [-UB_mu int]
          [-UB_sigma int] -c str [-e] [-g] [-l int] [-log] [-m str] [-o str]
-         -p str [-t int] T leaf_labeling
+         -p str [-t int] T leaf_labeling [-N int] [-P]
     Where:
       T
          Clone tree
@@ -335,27 +340,60 @@ In the parsimonious migration history with polytomy resolution we are given a cl
          Primary anatomical site
       -t int
          Number of threads (default: -1, #cores)
+      -N int
+         Number of solutions (default: 1)
+      -P 
+         Enable post-processing (default: False)
 
 An example execution (executed from the root directory of the MACHINA repository):
 
 
     $ mkdir patient1_tr
     $ pmh_tr -p LOv -c data/mcpherson_2016/coloring.txt data/mcpherson_2016/patient1.tree \
-    data/mcpherson_2016/patient1.labeling -o patient1_tr/ > patient1_tr/result.txt
+    data/mcpherson_2016/patient1.labeling -o patient1_tr/ -N 5 > patient1_tr/result.txt
     
     $ cat patient1_tr/result.txt
-    LOv-    (PS)    12      6       1       pPS     12125   12125   0.53603
-    LOv-    (PS, S) 12      6       1       pPS     12125   12125   0.242606
-    LOv-    (PS, S, M)      12      6       1       pPS     12125   12125   0.248338
-    LOv-    (PS, S, M, R)   11      7       2       pR      11148   11148   15.9117
+    LOv-    (PS)    0       12      6       1       pPS     12125   12125   0.302463
+    LOv-    (PS)    1       12      6       1       pPS     12125   12125   0.303952
+    LOv-    (PS)    2       12      6       1       pPS     12125   12125   0.305179
+    LOv-    (PS)    3       12      6       1       pPS     12125   12125   0.3064
+    LOv-    (PS)    4       12      6       1       pPS     12125   12125   0.307605
+    LOv-    (PS, S) 0       12      6       1       pPS     12125   12125   0.50031
+    LOv-    (PS, S) 1       12      6       1       pPS     12125   12125   0.501627
+    LOv-    (PS, S) 2       12      6       1       pPS     12125   12125   0.502769
+    LOv-    (PS, S) 3       12      6       1       pPS     12125   12125   0.503921
+    LOv-    (PS, S) 4       12      6       1       pPS     12125   12125   0.505132
+    LOv-    (PS, S, M)      0       12      6       1       pPS     12125   12125   0.509809
+    LOv-    (PS, S, M)      1       12      6       1       pPS     12125   12125   0.511246
+    LOv-    (PS, S, M)      2       12      6       1       pPS     12125   12125   0.512531
+    LOv-    (PS, S, M)      3       12      6       1       pPS     12125   12125   0.513785
+    LOv-    (PS, S, M)      4       12      6       1       pPS     12125   12125   0.515015
+    LOv-    (PS, S, M, R)   0       11      7       2       pR      11148   11148   3.53926
+    LOv-    (PS, S, M, R)   1       11      7       2       pR      11148   11148   3.54072
+    LOv-    (PS, S, M, R)   2       11      7       2       pR      11148   11148   3.54199
+    LOv-    (PS, S, M, R)   3       11      7       2       pR      11148   11148   3.54325
+    LOv-    (PS, S, M, R)   4       11      7       2       pR      11148   11148   3.54452
 
+Each line lists the solution found by `pmh_tr`. First the primary anatomical site is given, then the provided migration pattern restriction set, followed by the solution number,  migration number, comigration number and seeding site number. Finally, the identified migration pattern is given, followed by a lower bound (LB) on the optimal solution and then an upper bound (UB), ending with the total running time in seconds. In case LB == UB, the identified solution is optimal. Here, the input number of solutions is 5 and there's no post-processing, so the top 5 solutions are being reported for each pattern. In case `-P` flag is activated, `pmh_tr` will remove the duplicate trees, so the number of actual solutions will often be less than the input number of solutions. 
 
-The `results.txt` file is formatted in exactly the same way as `pmh`. 
+```
+$ mkdir patient1_tr
+$ pmh_tr -p LOv -c data/mcpherson_2016/coloring.txt data/mcpherson_2016/patient1.tree \
+data/mcpherson_2016/patient1.labeling -o patient1_tr/ -N 5 -P > patient1_tr/result.txt
+
+$ cat patient1_tr/result.txt
+LOv-    (PS)    0       12      6       1       pPS     12125   12125   0.439512
+LOv-    (PS, S) 0       12      6       1       pPS     12125   12125   0.438603
+LOv-    (PS, S, M)      0       12      6       1       pPS     12125   12125   0.53151
+LOv-    (PS, S, M, R)   0       11      7       2       pR      11148   11148   4.28141
+```
+
+Here only one solution has been reported for each pattern as other four solutions were outputting the same tree. 
 
 <a name="pmh_ti"></a>
 ### Parsimonious Migration History with Tree Inference (`pmh_ti`)
 
-Given a mutation tree `T` with mutation frequencies `F-` and `F+`, the task is to find a frequency assignment `F` yielding a refined clone tree `T'` that admits a vertex labeling `l` such that the resulting migration graph `G` has minimum number of migrations and comigrations. It is possible to specify constraints on the topology of the migration graph.
+Given a mutation tree `T` with mutation frequencies `F-` and `F+`, the task is to find a frequency assignment `F` yielding a refined clone tree `T'` that admits a vertex labeling `l` such that the resulting migration graph `G` has minimum number of migrations and co-migrations. It is possible to specify constraints on the topology of the migration graph.
 
 
     Usage:
@@ -426,3 +464,4 @@ An example execution (executed from the root directory of the MACHINA repository
     1-      (PS, S) 5       5       2       mS      5146.83 5146.83 37.8299
 
 The program `generatemutationtrees` uses the SPRUCE algorithm to enumerate all mutation trees given a frequency matrix. The program `pmh_ti` considers solves the PMH-TI problem for each enumerated mutation tree. The `results.txt` file is formatted in exactly the same way as in `pmh`.
+
