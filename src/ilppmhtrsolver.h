@@ -97,6 +97,8 @@ protected:
   
   /// Initialize ILP constraints regarding G
   virtual void initConstraintsG();
+
+  virtual void symmetryBreakingConstraints();
   
   /// Initialize ILP constraints regarding non-edges of G
   virtual void initConstraintsNonEdgesG();

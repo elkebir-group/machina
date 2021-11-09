@@ -162,6 +162,8 @@ protected:
   
   /// Initialize ILP S constraints
   virtual void initSingleSourceSeedingConstraints();
+
+  virtual void symmetryBreakingConstraints();
   
   /// Initialize initial solution
   virtual void initWarmStart();

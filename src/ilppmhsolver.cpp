@@ -62,6 +62,7 @@ void IlpPmhSolver::init(const IntTriple& bounds)
   initConstraintsNonEdgesG();
   initConstraints();
   initLeafConstraints();
+  symmetryBreakingConstraints();
   initObjective(bounds);
   initCallbacks();
   initWarmStart();
@@ -148,13 +149,16 @@ void IlpPmhSolver::initIndices()
   delete _pNodeToIndex;
   _pNodeToIndex = new IntNodeMap(getTree(), -1);
   
-  int idx = 0;
+  int idx = 1;
   for (NodeIt v(getTree()); v != lemon::INVALID; ++v)
   {
+    if (v == getRoot()) continue;
     _indexToNode[idx] = v;
     _pNodeToIndex->set(v, idx);
     ++idx;
   }
+  _indexToNode[0] = getRoot();
+  _pNodeToIndex->set(getRoot(), 0);
   
   // 4. Initialize _indexToArc and _arcToIndex
   const int nrArcs = lemon::countArcs(getTree());
@@ -876,36 +880,36 @@ void IlpPmhSolver::initConstraints()
   GRBLinExpr sum, sum2;
   
   // symmetry breaking constraints
-  for (int s = 0; s < nrAnatomicalSites; ++s)
-  {
-    const NodeSet& L_s = _L[s];
-    const int size_L_s = _L[s].size();
-    for (int c = 1; c < size_L_s; ++c)
-    {
-      for (Node v_i : L_s)
-      {
-        if (v_i == lemon::INVALID)
-        {
-          // dummy vertex
-          if (c == 1)
-          {
-            sum += 1;
-          }
-        }
-        else
-        {
-          const int i = (*_pNodeToIndex)[v_i];
-          sum += _x[i][s][c - 1];
-          sum2 += _x[i][s][c];
-          //std::cout << _x[i][s][c - 1].get(GRB_StringAttr_VarName) << "    " << _x[i][s][c].get(GRB_StringAttr_VarName) << std::endl;
-          //_model.addConstr(_x[i][s][c] <= _x[i][s][c - 1]);
-        }
-      }
-      _model.addConstr(sum2 <= sum);
-      sum.clear();
-      sum2.clear();
-    }
-  }
+  // for (int s = 0; s < nrAnatomicalSites; ++s)
+  // {
+  //   const NodeSet& L_s = _L[s];
+  //   const int size_L_s = _L[s].size();
+  //   for (int c = 1; c < size_L_s; ++c)
+  //   {
+  //     for (Node v_i : L_s)
+  //     {
+  //       if (v_i == lemon::INVALID)
+  //       {
+  //         // dummy vertex
+  //         if (c == 1)
+  //         {
+  //           sum += 1;
+  //         }
+  //       }
+  //       else
+  //       {
+  //         const int i = (*_pNodeToIndex)[v_i];
+  //         sum += _x[i][s][c - 1];
+  //         sum2 += _x[i][s][c];
+  //         //std::cout << _x[i][s][c - 1].get(GRB_StringAttr_VarName) << "    " << _x[i][s][c].get(GRB_StringAttr_VarName) << std::endl;
+  //         //_model.addConstr(_x[i][s][c] <= _x[i][s][c - 1]);
+  //       }
+  //     }
+  //     //_model.addConstr(sum2 <= sum);
+  //     sum.clear();
+  //     sum2.clear();
+  //   }
+  // }
   
   // root vertex is labeled by (P,1)
   _model.addConstr(_x[(*_pNodeToIndex)[getRoot()]][_primaryIndex][0] == 1);
@@ -1133,6 +1137,10 @@ void IlpPmhSolver::initConstraints()
   }
   
   _model.update();
+}
+
+void IlpPmhSolver::symmetryBreakingConstraints(){
+  std::cout<<"Symmetry breaking has been only implemented for pmh_tr"<<std::endl;
 }
 
 void IlpPmhSolver::initSingleSourceSeedingConstraints()

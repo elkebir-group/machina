@@ -231,6 +231,23 @@ void IlpPmhTrSolver::processSolution(bool post_processing)
     constructGraph();
     _pNodeToStateSet[nSoln] = new IntPairSetNodeMap(getTree());
     _pNodeToRootState[nSoln] = new IntPairNodeMap(getTree());
+//       for (int i = 0; i < nrNodes; ++i)
+//  {
+//    Node v_i = _indexToNode[i];
+//    for (int s = 0; s < nrAnatomicalSites; ++s)
+//    {
+//      int size_L_s = _L[s].size();
+//      for (int c = 0; c < size_L_s; ++c)
+//      {
+//        if (_x[i][s][c].get(GRB_DoubleAttr_Xn) >= 0.4)
+//        {
+//          std::cout << _x[i][s][c].get(GRB_StringAttr_VarName)
+//          << " = " << _x[i][s][c].get(GRB_DoubleAttr_X) << std::endl;
+//        }
+//      }
+//    }
+//  }
+// std::cout <<"..........."<<std::endl;
 //  for (int s = 0; s < nrAnatomicalSites; ++s)
 //  {
 //    for (int t = 0; t < nrAnatomicalSites; ++t)
@@ -895,6 +912,48 @@ void IlpPmhTrSolver::initVertexLabelingConstraints()
       _model.addConstr(sum == 1);
     }
     sum.clear();
+  }
+}
+
+void IlpPmhTrSolver::symmetryBreakingConstraints(){
+  const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
+  const int nrNodes = _indexToNode.size();
+  GRBLinExpr sum;
+  for (int s = 0; s < nrAnatomicalSites; s++){
+    const int size_L_s = _L[s].size();
+    for (int c1=0; c1<size_L_s; c1++){
+      for (int c2=c1+1; c2<size_L_s;c2++){
+        for(int i=0; i<nrNodes; i++){
+          sum += std::pow(2, size_L_s - i - 1) * (_r[i][s][c1] - _r[i][s][c2]);
+        }
+        _model.addConstr(sum >= 0);
+        sum.clear();
+      }
+    }
+  }
+
+  for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i){
+    if (lemon::countOutArcs(getTree(), v_i) > 2){
+      const int i = (*_pNodeToIndex)[v_i];
+      for (int s = 0; s < nrAnatomicalSites; ++s){
+        const int size_L_s = _L[s].size();
+        for (int c = 0; c < size_L_s; ++c){
+          for(OutArcIt m(getTree(), v_i); m != lemon::INVALID; ++m){
+            const int j = (*_pNodeToIndex)[getTree().target(m)];
+            sum += _r[j][s][c];
+          }
+          _model.addConstr(sum >= 2 * _x[i][s][c] - _r[i][s][c]);
+          sum.clear();
+        }
+      }
+    }
+  }
+  
+  for (int s = 0; s < nrAnatomicalSites; ++s){
+    const int size_L_s = _L[s].size();
+    for (int c = 1; c < size_L_s; ++c){
+      _model.addConstr(_y[s][c] <= _y[s][c - 1]);
+    }
   }
 }
 
