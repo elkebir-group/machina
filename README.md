@@ -293,7 +293,9 @@ Each line lists the solution found by MACHINA. First the primary anatomical site
 
 In the parsimonious migration history with polytomy resolution we are given a clone tree `T` whose leaves are labeled by anatomical sites. The task is to find a refinement `T'` of `T` and label its inner vertices such that the resulting migration graph `G` has minimum migration number, comigration number and seeding site number. It is possible to specify constraints on the topology of the migration graph. 
 
-**(New)** - Now it can enumerate through multiple optimal/sub-optimal solutions. the flag `-N` can be used to specify the number of solutions to fetch. One problem is that `pmh_tr` outputs multiple identical trees when their internal representation inside `pmh_tr` is different. To remove such duplicate trees, `-P` flag can be used.
+**(Update 10/4/21)** - Now it can enumerate through multiple optimal/sub-optimal solutions. the flag `-N` can be used to specify the number of solutions to fetch. One problem is that `pmh_tr` outputs multiple identical trees when their internal representation inside `pmh_tr` is different. To remove such duplicate trees, `-P` flag can be used.
+
+**(Update 11/9/21)** - Symmetry breaking constraints added, so no need to do post-processing. 
 
     Usage:
       pmh_tr [--help|-h|-help] [-G str] [-OLD] [-UB_gamma int] [-UB_mu int]
