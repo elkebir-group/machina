@@ -509,10 +509,10 @@ find_package( GUROBI REQUIRED )
 
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG" )
 
-add_executable( pmh_sankoff ${pmh_sankoff_src} ${pmh_sankoff_hdr} )
+add_executable( pmh_sankoff EXCLUDE_FROM_ALL ${pmh_sankoff_src} ${pmh_sankoff_hdr} )
 target_link_libraries( pmh_sankoff ${CommonLibs} )
 
-add_executable( pmh ${pmh_src} ${pmh_hdr} )
+add_executable( pmh EXCLUDE_FROM_ALL ${pmh_src} ${pmh_hdr} )
 target_include_directories( pmh PUBLIC "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} )
 target_link_libraries( pmh ${CommonLibs} ${GUROBI_LIBRARIES} )
 
@@ -520,7 +520,7 @@ add_executable( pmh_tr ${pmh_tr_src} ${pmh_tr_hdr} )
 target_include_directories( pmh_tr PUBLIC "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} )
 target_link_libraries( pmh_tr ${CommonLibs} ${GUROBI_LIBRARIES} )
 
-add_executable( pmh_ti ${pmh_ti_src} ${pmh_ti_hdr} )
+add_executable( pmh_ti EXCLUDE_FROM_ALL ${pmh_ti_src} ${pmh_ti_hdr} )
 target_include_directories( pmh_ti PUBLIC "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} )
 target_link_libraries( pmh_ti ${CommonLibs} ${GUROBI_LIBRARIES} )
 
