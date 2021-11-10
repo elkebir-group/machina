@@ -924,7 +924,7 @@ void IlpPmhTrSolver::symmetryBreakingConstraints(){
     for (int c1=0; c1<size_L_s; c1++){
       for (int c2=c1+1; c2<size_L_s;c2++){
         for(int i=0; i<nrNodes; i++){
-          sum += std::pow(2, size_L_s - i - 1) * (_r[i][s][c1] - _r[i][s][c2]);
+          sum += std::pow(2, nrNodes - i - 1) * (_r[i][s][c1] - _r[i][s][c2]);
         }
         _model.addConstr(sum >= 0);
         sum.clear();
@@ -942,7 +942,7 @@ void IlpPmhTrSolver::symmetryBreakingConstraints(){
             const int j = (*_pNodeToIndex)[getTree().target(m)];
             sum += _r[j][s][c];
           }
-          _model.addConstr(sum >= 2 * _x[i][s][c] - _r[i][s][c]);
+          _model.addConstr(sum >= 2 * (_x[i][s][c] - _r[i][s][c]));
           sum.clear();
         }
       }
