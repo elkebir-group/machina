@@ -188,7 +188,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
                             const IntTriple& bounds,
                             const StringPairList& forcedComigrations,
                             int nrSolutions,
-                            bool post_processing)
+                            bool post_processing,
+                            bool count_mode)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -222,7 +223,8 @@ IntTriple IlpPmhSolver::run(const CloneTree& T,
              bounds,
              forcedComigrations,
              nrSolutions,
-             post_processing);
+             post_processing,
+             count_mode);
 }
 
 IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
@@ -239,7 +241,8 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
                             const IntTriple& bounds,
                             const StringPairList& forcedComigrations,
                             int nrSolutions,
-                            bool post_processing)
+                            bool post_processing,
+                            bool count_mode)
 {
   char buf[1024];
   std::string filenameSearchGraph;
@@ -275,7 +278,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
   }
   
   lemon::Timer timer;
-  bool solved = solver.solve(nrThreads, timeLimit, nrSolutions, post_processing);
+  bool solved = solver.solve(nrThreads, timeLimit, nrSolutions, post_processing, count_mode);
   if (!solved)
   {
     std::cout << outputPrefix << "\t"
@@ -289,6 +292,28 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
               << timer.realTime()
               << std::endl;
 
+    IntTriple res;
+    res.first = -1;
+    res.second.first = -1;
+    res.second.second = -1;
+    
+    return res;
+  }
+
+  if (count_mode){
+    std::cout << "Total number of solutions: " << solver.anrSolutions<<std::endl;
+    int opt_count = 1;
+    solver._model.set(GRB_IntParam_SolutionNumber, 0);
+    double best = solver._model.get(GRB_DoubleAttr_PoolObjVal);
+    for (int solIdx = 1; solIdx < solver.anrSolutions; solIdx++){
+      solver._model.set(GRB_IntParam_SolutionNumber, solIdx);
+      if(best == solver._model.get(GRB_DoubleAttr_PoolObjVal))
+        opt_count++;
+      else
+        break;
+      }
+    std::cout << "Number of optimal solutions: " << opt_count << std::endl;
+    
     IntTriple res;
     res.first = -1;
     res.second.first = -1;
@@ -553,7 +578,7 @@ void IlpPmhSolver::initConstraintsG()
   sum.clear();*/
 }
 
-bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing)
+bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing, bool count_mode)
 {
   try
   {
@@ -588,7 +613,7 @@ bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions, bool pos
       _LB = _model.get(GRB_DoubleAttr_ObjBound);
       _UB = _model.get(GRB_DoubleAttr_ObjVal);
       anrSolutions = _model.get(GRB_IntAttr_SolCount);
-      processSolution(post_processing);
+      if (!count_mode) processSolution(post_processing);
       return true;
     }
     else if (status == GRB_INF_OR_UNBD)
@@ -615,7 +640,7 @@ bool IlpPmhSolver::solve(int nrThreads, int timeLimit, int nrSolutions, bool pos
       anrSolutions = _model.get(GRB_IntAttr_SolCount);
       if (_UB < std::numeric_limits<double>::max() && _UB != NAN)
       {
-        processSolution(post_processing);
+        if (!count_mode) processSolution(post_processing);
         return true;
       }
       return false;

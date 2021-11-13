@@ -944,6 +944,7 @@ void IlpPmhTrSolver::symmetryBreakingConstraints(){
           }
           _model.addConstr(sum >= 2 * (_x[i][s][c] - _r[i][s][c]));
           sum.clear();
+          
         }
       }
     }
@@ -970,7 +971,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                               const IntTriple& bounds,
                               const StringPairList& forcedComigrations,
                               int nrSolutions,
-                              bool post_processing)
+                              bool post_processing,
+                              bool count_mode)
 {
   std::string filenameGurobiLog;
   if (!outputDirectory.empty())
@@ -1005,7 +1007,8 @@ IntTriple IlpPmhTrSolver::run(const CloneTree& T,
                            bounds,
                            forcedComigrations,
                            nrSolutions,
-                           post_processing);
+                           post_processing,
+                           count_mode);
 }
 
 void IlpPmhTrSolver::refine(const BoolNodeMap& leafPresence,

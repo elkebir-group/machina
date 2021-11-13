@@ -57,7 +57,7 @@ public:
   /// @param nrThreads Number of threads
   /// @param timeLimit Time limit in seconds (-1: no time limit)
   /// @param nrSolutions Number of solutions
-  bool solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing);
+  bool solve(int nrThreads, int timeLimit, int nrSolutions, bool post_processing, bool count_mode);
   
   /// Export ILP model
   void exportModel(const std::string& filename);
@@ -124,7 +124,8 @@ public:
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
                        int nrSolutions,
-                       bool post_processing);
+                       bool post_processing,
+                       bool count_mode);
   
 protected:
   /// Initialize indices and mappings
@@ -276,7 +277,8 @@ protected:
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
                        int nrSolutions,
-                       bool post_processing);
+                       bool post_processing,
+                       bool count_mode);
   
   /// Vector of node sets
   typedef std::vector<NodeSet> NodeSetVector;

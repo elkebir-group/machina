@@ -65,7 +65,8 @@ public:
                        const IntTriple& bounds,
                        const StringPairList& forcedComigrations,
                        int nrSolutions,
-                       bool post_processing);
+                       bool post_processing,
+                       bool count_mode);
   
   /// Return refined clone tree of provided solution index
   /// @param solIdx Solution index

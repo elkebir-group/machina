@@ -37,6 +37,7 @@ int main(int argc, char** argv)
   bool oldMode = false;
   int nrSolutions = 1;
   bool post_processing = false;
+  bool count_mode = false;
   
   lemon::ArgParser ap(argc, argv);
   ap.refOption("c", "Color map file", filenameColorMap, true)
@@ -62,7 +63,8 @@ int main(int argc, char** argv)
     .refOption("UB_gamma", "Upper bound on the comigration number (default: -1, disabled)", bounds.second.first)
     .refOption("UB_sigma", "Upper bound on the seeding site number (default: -1, disabled)", bounds.second.second)
     .refOption("l", "Time limit in seconds (default: -1, no time limit)", timeLimit)
-    .refOption("P", "Enable post processing (default: False)", post_processing);
+    .refOption("P", "Enable post processing (default: False)", post_processing)
+    .refOption("C", "Only output the number of solutions (default: False)", count_mode);
   ap.parse();
   
   if (ap.files().size() != 2)
@@ -161,6 +163,10 @@ int main(int argc, char** argv)
     std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
+
+  if(nrSolutions == 1 && count_mode == 1){
+    nrSolutions = 2000000000;
+  }
   
   char buf[1024];
   for (MigrationGraph::Pattern pattern : patterns)
@@ -186,7 +192,8 @@ int main(int argc, char** argv)
                               bounds,
                               migrationTree,
                               nrSolutions,
-                              post_processing);
+                              post_processing,
+                              count_mode);
         }
         else
         {
@@ -222,7 +229,8 @@ int main(int argc, char** argv)
                             bounds,
                             StringPairList(),
                             nrSolutions,
-                            post_processing);
+                            post_processing,
+                            count_mode);
       }
       else
       {
