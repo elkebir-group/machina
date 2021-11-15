@@ -301,7 +301,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
   }
 
   if (count_mode){
-    std::cout << "Total number of solutions: " << solver.anrSolutions<<std::endl;
+    std::cout << outputPrefix <<  "\t(" << MigrationGraph::getAllowedPatternsString(pattern) << ")\t" << solver.anrSolutions<<"\t";
     int opt_count = 1;
     solver._model.set(GRB_IntParam_SolutionNumber, 0);
     double best = solver._model.get(GRB_DoubleAttr_PoolObjVal);
@@ -312,7 +312,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
       else
         break;
       }
-    std::cout << "Number of optimal solutions: " << opt_count << std::endl;
+    std::cout << opt_count << std::endl;
     
     IntTriple res;
     res.first = -1;

@@ -297,6 +297,8 @@ In the parsimonious migration history with polytomy resolution we are given a cl
 
 **(Update 11/9/21)** - Symmetry breaking constraints added, so no need to do post-processing. 
 
+**(Update 11/15/21)** - A new flag, '-C,' has been added to count the number of solutions without printing the trees. The flag outputs the precise size of the solution space if '-N' is not used (assuming the number of solution is less than 2,000,000,000). Using **pmh tr** without '-N' may be slow. The count will be bounded by the value of '-N' if '-N' is used. Using `-C` with `-N` may be useful to know if the number of solution is greater than a specific threshold.
+
     Usage:
       pmh_tr [--help|-h|-help] [-G str] [-OLD] [-UB_gamma int] [-UB_mu int]
          [-UB_sigma int] -c str [-e] [-g] [-l int] [-log] [-m str] [-o str]
@@ -308,6 +310,8 @@ In the parsimonious migration history with polytomy resolution we are given a cl
          Leaf labeling
       --help|-h|-help
          Print a short help message
+      -C
+         Only output the number of solutions (default: False)
       -G str
          Optional file with migration graphs
       -OLD
@@ -391,6 +395,32 @@ LOv-    (PS, S, M, R)   0       11      7       2       pR      11148   11148   
 ```
 
 Here only one solution has been reported for each pattern as other four solutions were outputting the same tree. 
+
+If '-C' is used, **pmh tr** prints the primary anatomical site, the specified migration pattern, the total number of feasible solutions or the size of solution space, and the number of optimal solutions in that order. If '-N' is used with `-C`, the count is bounded by the value of `-N`.
+
+```
+$ mkdir patient1_tr
+$ pmh_tr -p LOv -c ../data/mcpherson_2016/coloring.txt ../data/mcpherson_2016/patient1.tree\ 
+../data/mcpherson_2016/patient1.labeling -o patient1_tr -C > patient1_tr/result.txt
+
+$ cat patient1_tr/result.txt
+LOv-    (PS)    8       1
+LOv-    (PS, S) 8       1
+LOv-    (PS, S, M)      36      1
+LOv-    (PS, S, M, R)   33248   1
+```
+
+Here, the number of solutions for **(PS, S, M, R)** pattern has been bounded by the value of $N=1000$.
+```
+$ pmh_tr -p LOv -c ../data/mcpherson_2016/coloring.txt ../data/mcpherson_2016/patient1.tree\ 
+../data/mcpherson_2016/patient1.labeling -o patient1_tr -C -N 1000 > patient1_tr/result.txt
+
+$ cat patient1_tr/result.txt
+LOv-    (PS)    8       1
+LOv-    (PS, S) 8       1
+LOv-    (PS, S, M)      36      1
+LOv-    (PS, S, M, R)   1000    1
+```
 
 <a name="pmh_ti"></a>
 ### Parsimonious Migration History with Tree Inference (`pmh_ti`)
