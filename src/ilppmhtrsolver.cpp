@@ -78,6 +78,30 @@ void IlpPmhTrSolver::processSolution(bool post_processing)
   const int anrSolutions = _model.get(GRB_IntAttr_SolCount);
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
   const int nrNodes = _indexToNode.size();
+
+  // std::cout << "............." << std::endl;
+
+  //   for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i){
+  //   if (lemon::countOutArcs(getTree(), v_i) > 0){
+  //     const int i = (*_pNodeToIndex)[v_i];
+  //     for (int s = 0; s < nrAnatomicalSites; ++s){
+  //       const int size_L_s = _L[s].size();
+  //       for (int c = 0; c < size_L_s; ++c){
+  //         for (int t = 0; t < nrAnatomicalSites; ++t){
+  //           const int size_L_t = _L[t].size();
+  //           for (int d = 0; d < size_L_t; ++d){
+  //             std::cout<< _zz[i][s][c][t][d].get(GRB_StringAttr_VarName) << _zz[i][s][c][t][d].get(GRB_DoubleAttr_Xn) << " -> ";
+  //             for(OutArcIt m(getTree(), v_i); m != lemon::INVALID; ++m){
+  //               const int ij = (*_pArcToIndex)[m];
+  //               std::cout << _xx[ij][s][c][t][d].get(GRB_StringAttr_VarName) << _xx[ij][s][c][t][d].get(GRB_DoubleAttr_Xn) <<" ";
+  //             }
+  //             std::cout << std::endl;
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
   
   /**_model.set(GRB_IntParam_SolutionNumber, 2);
   for(int s = 0; s < nrAnatomicalSites; ++s){
@@ -944,11 +968,67 @@ void IlpPmhTrSolver::symmetryBreakingConstraints(){
           }
           _model.addConstr(sum >= 2 * (_x[i][s][c] - _r[i][s][c]));
           sum.clear();
-          
         }
       }
     }
   }
+
+  for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i){
+    if (lemon::countOutArcs(getTree(), v_i) > 2){
+      const int i = (*_pNodeToIndex)[v_i];
+      for (int s = 0; s < nrAnatomicalSites; ++s){
+        const int size_L_s = _L[s].size();
+        for (int c = 0; c < size_L_s; ++c){
+          for (int t = 0; t < nrAnatomicalSites; ++t){
+            const int size_L_t = _L[t].size();
+            for (int d = 0; d < size_L_t; ++d){
+              sum += _zz[i][s][c][t][d];
+            }
+          }
+          for(OutArcIt m(getTree(), v_i); m != lemon::INVALID; ++m){
+            const int j = (*_pNodeToIndex)[getTree().target(m)];
+            sum += _r[j][s][c];
+          }
+          for (int t = 0; t < nrAnatomicalSites; ++t){
+            const int size_L_t = _L[t].size();
+            for (int d = 0; d < size_L_t; ++d){
+              for(OutArcIt m(getTree(), v_i); m != lemon::INVALID; ++m){
+                const int j = (*_pNodeToIndex)[getTree().target(m)];
+                const int ij = (*_pArcToIndex)[m];
+                sum += (_r[j][t][d] - _xx[ij][t][d][t][d]);
+              }
+            }
+          }
+          _model.addConstr(sum >= 2 * _r[i][s][c]);
+          sum.clear();
+        }
+      }
+    }
+  }
+
+  // for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i){
+  //   if (lemon::countOutArcs(getTree(), v_i) > 0){
+  //     const int i = (*_pNodeToIndex)[v_i];
+  //     for (int s = 0; s < nrAnatomicalSites; ++s){
+  //       const int size_L_s = _L[s].size();
+  //       for (int c = 0; c < size_L_s; ++c){
+  //         for (int t = 0; t < nrAnatomicalSites; ++t){
+  //           const int size_L_t = _L[t].size();
+  //           for (int d = 0; d < size_L_t; ++d){
+  //             sum += _zz[i][s][c][t][d];
+  //             for(OutArcIt m(getTree(), v_i); m != lemon::INVALID; ++m){
+  //               const int ij = (*_pArcToIndex)[m];
+  //               sum += _xx[ij][s][c][t][d];
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //     _model.addConstr(sum >= 2 * _r[i][s][c]);
+  //     sum.clear();
+  //   }
+  //}
+
   
   for (int s = 0; s < nrAnatomicalSites; ++s){
     const int size_L_s = _L[s].size();
