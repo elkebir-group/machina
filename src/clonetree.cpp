@@ -200,6 +200,58 @@ void CloneTree::writeDOT(std::ostream& out,
 void CloneTree::writeDOT(std::ostream& out,
                          const StringNodeMap& lPlus,
                          const StringToIntMap& colorMap,
+                         IntNodeMap& characterLabel) const
+{
+  out << "digraph T {" << std::endl;
+  out << "\t{" << std::endl;
+  out << "\t\trank=same" << std::endl;
+  for (NodeIt u(_tree); u != lemon::INVALID; ++u)
+  {
+    if (_isLeaf[u])
+    {
+      out << "\t\t" << _tree.id(u) << " [penwidth=3,colorscheme=set19,color="
+          << colorMap.find(lPlus[u])->second
+          << ",label=\"" << _nodeToId[u]  << "\\n" << lPlus[u] << "\"]" << std::endl;
+    }
+  }
+  out << "\t}" << std::endl;
+  
+  for (NodeIt u(_tree); u != lemon::INVALID; ++u)
+  {
+    if (!_isLeaf[u])
+    {
+      out << "\t" << _tree.id(u) << " [penwidth=3,colorscheme=set19,color="
+          << colorMap.find(lPlus[u])->second << ",label=\"" << _nodeToId[u] << "\"]" << std::endl;
+    }
+  }
+  
+  for (ArcIt a(_tree); a != lemon::INVALID; ++a)
+  {
+    Node u = _tree.source(a);
+    Node v = _tree.target(a);
+    
+    const std::string& s_u = lPlus[u];
+    const std::string& s_v = lPlus[v];
+    
+    out << "\t" << _tree.id(u) << " -> " << _tree.id(v);
+    if (s_u == s_v)
+    {
+      out << " [penwidth=3,colorscheme=set19,color=" << colorMap.find(s_u)->second << "]";
+    }
+    else
+    {
+      out << " [penwidth=3,colorscheme=set19,color=\"" << colorMap.find(s_u)->second << ";0.5:" << colorMap.find(s_v)->second << "\"]";
+    }
+    
+    out << std::endl;
+  }
+  
+  out << "}" << std::endl;
+}
+
+void CloneTree::writeDOT(std::ostream& out,
+                         const StringNodeMap& lPlus,
+                         const StringToIntMap& colorMap,
                          const DoubleNodeMap& U,
                          const IntNodeMap& characterLabel) const
 {
@@ -416,7 +468,7 @@ void CloneTree::writeDOT(std::ostream& out,
     if (_isLeaf[u])
     {
       out << "\t\t" << _tree.id(u) << " [penwidth=3,colorscheme=set19,color="
-          << colorMap.find(l(u))->second << ",label=\"" << _nodeToId[u] << "\\n" << _l[u] << "\"]" << std::endl;
+          << colorMap.find(l(u))->second << ",label=\"" << _nodeToId[u] <<"p" << "\\n" << _l[u] << "\"]" << std::endl;
     }
   }
   out << "\t}" << std::endl;

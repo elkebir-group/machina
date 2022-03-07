@@ -326,11 +326,11 @@ void IlpPmhTrSolver::processSolution(bool post_processing)
         }
       }
     }
-      
+  //  const int nrArcs = _indexToArc.size();
   //  for (int ij = 0; ij < nrArcs; ++ij)
   //  {
   //    Arc a_ij = _indexToArc[ij];
-  //
+  
   //    for (int s = 0; s < nrAnatomicalSites; ++s)
   //    {
   //      int size_L_s = _L[s].size();
@@ -412,6 +412,26 @@ void IlpPmhTrSolver::initVariables()
                  getLabel(v_i).c_str(),
                  _indexToAnatomicalSite[s].c_str(), c);
         _r[i][s][c] = strlen(buf) > 255 ? _model.addVar(0, 1, 0, GRB_BINARY) : _model.addVar(0, 1, 0, GRB_BINARY, buf);
+      }
+    }
+  }
+
+  _p = Var3Matrix(nrNodes);
+  for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i)
+  {
+    //if (isLeaf(v_i)) continue;
+    const int i = (*_pNodeToIndex)[v_i];
+    _p[i] = VarMatrix(nrAnatomicalSites);
+    for (int s = 0; s < nrAnatomicalSites; ++s)
+    {
+      const int size_L_s = _L[s].size();
+      _p[i][s] = VarArray(size_L_s);
+      for (int c = 0; c < size_L_s; ++c)
+      {
+        snprintf(buf, 1024, "p;%s;%s;%d",
+                 getLabel(v_i).c_str(),
+                 _indexToAnatomicalSite[s].c_str(), c);
+        _p[i][s][c] = strlen(buf) > 255 ? _model.addVar(0, 1, 0, GRB_BINARY) : _model.addVar(0, 1, 0, GRB_BINARY, buf);
       }
     }
   }
@@ -527,7 +547,7 @@ void IlpPmhTrSolver::initConstraintsNonEdgesG()
   _model.update();
 }
 
-bool IlpPmhTrSolver::nextCombinationStates(                                          IntPairVector& states) const
+bool IlpPmhTrSolver::nextCombinationStates(IntPairVector& states) const
 {
   int n = states.size();
   
@@ -940,21 +960,104 @@ void IlpPmhTrSolver::initVertexLabelingConstraints()
 }
 
 void IlpPmhTrSolver::symmetryBreakingConstraints(){
+
+  //p related constraints
+  _model.addConstr(_p[(*_pNodeToIndex)[getRoot()]][_primaryIndex][0] == 1);
   const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
   const int nrNodes = _indexToNode.size();
   GRBLinExpr sum;
-  for (int s = 0; s < nrAnatomicalSites; s++){
-    const int size_L_s = _L[s].size();
-    for (int c1=0; c1<size_L_s; c1++){
-      for (int c2=c1+1; c2<size_L_s;c2++){
-        for(int i=0; i<nrNodes; i++){
-          sum += std::pow(2, nrNodes - i - 1) * (_r[i][s][c1] - _r[i][s][c2]);
+  for (int t = 0; t < nrAnatomicalSites; t++){
+    const int size_L_t = _L[t].size();
+    for (int d=0; d<size_L_t; d++){
+      for(int i=0; i<nrNodes; i++){
+        sum += _p[i][t][d];
+        Node v_i = _indexToNode[i];
+        for (int s = 0; s < nrAnatomicalSites; s++){
+          const int size_L_s = _L[s].size();
+          for (int c=0; c<size_L_s; c++){
+            _model.addConstr(_p[i][t][d] >= _zz[i][s][c][t][d]);
+            const int p_i = (*_pNodeToIndex)[getParent(v_i)];
+            Arc a_pii = InArcIt(getTree(), v_i);
+            const int pii = (*_pArcToIndex)[a_pii];
+            _model.addConstr(_p[i][t][d] >= _xx[pii][s][c][t][d] - _x[p_i][t][d]);
+          }
         }
-        _model.addConstr(sum >= 0);
-        sum.clear();
+      }
+      //_model.addConstr(sum == _y[t][d]);
+      sum.clear();
+    }
+  }
+
+  for (int t = 0; t < nrAnatomicalSites; t++){
+    for(int i=0; i<nrNodes; i++){
+      for(int j=i+1; j<nrNodes; j++){
+        const int size_L_t = _L[t].size();
+        for (int d1=0; d1<size_L_t; d1++){
+          for (int d2=d1+1; d2<size_L_t;d2++){
+            _model.addConstr(_p[i][t][d2]+_p[j][t][d1] <= 1);
+          }
+        }
       }
     }
   }
+
+
+
+
+  // const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
+  // const int nrNodes = _indexToNode.size();
+  // GRBLinExpr sum;
+  // for (int s = 0; s < nrAnatomicalSites; s++){
+  //   const int size_L_s = _L[s].size();
+  //   for (int c1=0; c1<size_L_s; c1++){
+  //     for (int c2=c1+1; c2<size_L_s;c2++){
+  //       for(int i=0; i<nrNodes; i++){
+  //         sum += std::pow(2, nrNodes - i - 1) * (_x[i][s][c1] - _x[i][s][c2]);
+  //       }
+  //       _model.addConstr(sum >= 0);
+  //       sum.clear();
+  //     }
+  //   }
+  // }
+
+  // const int nrAnatomicalSites = _anatomicalSiteToIndex.size();
+  // const int nrNodes = _indexToNode.size();
+  // GRBLinExpr sum;
+  // for (int t = 0; t < nrAnatomicalSites; t++){
+  //   for(int i=0; i<nrNodes; i++){
+  //     for(int j=i+1; j<nrNodes; j++){
+  //       const int size_L_t = _L[t].size();
+  //       for (int d1=0; d1<size_L_t; d1++){
+  //         for (int d2=d1+1; d2<size_L_t;d2++){
+  //           for (int s1 = 0; s1 < nrAnatomicalSites; s1++){
+  //             const int size_L_s1 = _L[s1].size();
+  //             for (int c1=0; c1<size_L_s1; c1++){
+  //               for (int s2 = 0; s2 < nrAnatomicalSites; s2++){
+  //                 const int size_L_s2 = _L[s2].size();
+  //                 for (int c2=0; c2<size_L_s2; c2++){
+  //                   Node v_i = _indexToNode[i];
+  //                   Node v_j = _indexToNode[j];
+  //                   const int p_i = (*_pNodeToIndex)[getParent(v_i)];
+  //                   const int p_j = (*_pNodeToIndex)[getParent(v_j)];
+  //                   if (v_j == getRoot()) continue;
+  //                   Arc a_pii = InArcIt(getTree(), v_i);
+  //                   Arc a_pjj = InArcIt(getTree(), v_j);
+  //                   const int pii = (*_pArcToIndex)[a_pii];
+  //                   const int pjj = (*_pArcToIndex)[a_pjj];
+  //                    _model.addConstr(_xx[pjj][s1][c1][t][d1] - _x[p_j][t][d1] + _zz[i][s2][c2][t][d2] <= 1);
+  //                    _model.addConstr(_zz[j][s1][c1][t][d1] + _zz[i][s2][c2][t][d2] <= 1);
+  //                    _model.addConstr(_xx[pjj][s1][c1][t][d1] - _x[p_j][t][d1] + _xx[pii][s2][c2][t][d2] - _x[p_i][t][d2] <= 1);
+  //                    _model.addConstr(_zz[j][s1][c1][t][d1] + _xx[pii][s2][c2][t][d2] - _x[p_i][t][d2] <= 1);
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
 
   for (NodeIt v_i(getTree()); v_i != lemon::INVALID; ++v_i){
     if (lemon::countOutArcs(getTree(), v_i) > 2){

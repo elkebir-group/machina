@@ -57,7 +57,7 @@ void IlpPmhSolver::init(const IntTriple& bounds)
   initVariables();
   initLeafVariables();
   initVertexLabelingConstraints();
-  initForcedComigrations();
+  //initForcedComigrations();
   initConstraintsG();
   initConstraintsNonEdgesG();
   initConstraints();
@@ -312,7 +312,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
       else
         break;
       }
-    std::cout << opt_count << std::endl;
+    std::cout << opt_count << '\t' << best << std::endl;
     
     IntTriple res;
     res.first = -1;
@@ -350,6 +350,8 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
         all_trees.insert(tree_as_set);
       }
     }
+
+    //std::cout << solver.getTree().id(solver.getRoot())<<"puko";
     
     std::cout << outputPrefix << "\t"
               << "(" << MigrationGraph::getAllowedPatternsString(pattern) << ")\t"
@@ -360,7 +362,7 @@ IntTriple IlpPmhSolver::run(IlpPmhSolver& solver,
               << G.getPatternString(G.getPattern(), G.isMonoclonal()) << "\t"
               << solver.LB() << "\t"
               << solver.UB() << "\t"
-              << timer.realTime()
+              << timer.realTime()<<"\t"
               << std::endl;
     
     if (!outputDirectory.empty())
@@ -1538,5 +1540,6 @@ void IlpPmhSolver::writeCloneTree(std::ostream& out,
                                   const StringToIntMap& colorMap,
                                   int solIdx) const
 {
-  T(solIdx).writeDOT(out, lPlus(solIdx), colorMap);
+  T(solIdx).writeDOT(out, lPlus(solIdx), colorMap, *_pNodeToIndex);
+  //std::cout<<"puko"<<(*_pNodeToIndex)[T(solIdx).root()]<<"vulko";
 }

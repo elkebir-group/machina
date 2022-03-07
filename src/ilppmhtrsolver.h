@@ -166,6 +166,8 @@ protected:
   Var5Matrix _zz;
   /// _r[i][s][c], root color
   Var3Matrix _r;
+  //for symmetry breaking
+  Var3Matrix _p;
   /// Callback class
   IlpPmhPrSolverCycleElimination* _pCallback;
 };

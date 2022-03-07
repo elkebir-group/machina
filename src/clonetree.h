@@ -101,6 +101,11 @@ public:
   void writeDOT(std::ostream& out,
                 const StringNodeMap& lPlus,
                 const StringToIntMap& colorMap) const;
+
+  void writeDOT(std::ostream& out,
+                         const StringNodeMap& lPlus,
+                         const StringToIntMap& colorMap,
+                         IntNodeMap& characterLabel) const;
   
   /// Print tree in DOT format using the given vertex labeling and color map
   ///

@@ -1,0 +1,32 @@
+digraph barS {
+	{
+		rank=same
+	7 [shape=box,penwidth=3,colorscheme=set19,color=7,label="M7"]
+	}
+	{
+		rank=same
+		8 [shape=box,penwidth=3,colorscheme=set19,color=8,label="M8"]
+		7 [shape=box,penwidth=3,colorscheme=set19,color=7,label="M7"]
+		6 [shape=box,penwidth=3,colorscheme=set19,color=6,label="M6"]
+		5 [shape=box,penwidth=3,colorscheme=set19,color=5,label="M5"]
+		4 [shape=box,penwidth=3,colorscheme=set19,color=4,label="M4"]
+		3 [shape=box,penwidth=3,colorscheme=set19,color=3,label="M3"]
+		1 [shape=box,penwidth=3,colorscheme=set19,color=1,label="M1"]
+	}
+	2 [shape=box,penwidth=3,colorscheme=set19,color=2,label="M2"]
+	0 [shape=box,penwidth=3,colorscheme=set19,color=0,label="P"]
+	2 -> 6 [penwidth=3,colorscheme=set19,color="2;0.5:6"]
+	2 -> 1 [penwidth=3,colorscheme=set19,color="2;0.5:1"]
+	2 -> 4 [penwidth=3,colorscheme=set19,color="2;0.5:4"]
+	2 -> 4 [penwidth=3,colorscheme=set19,color="2;0.5:4"]
+	2 -> 5 [penwidth=3,colorscheme=set19,color="2;0.5:5"]
+	2 -> 5 [penwidth=3,colorscheme=set19,color="2;0.5:5"]
+	2 -> 3 [penwidth=3,colorscheme=set19,color="2;0.5:3"]
+	2 -> 3 [penwidth=3,colorscheme=set19,color="2;0.5:3"]
+	2 -> 0 [penwidth=3,colorscheme=set19,color="2;0.5:0"]
+	0 -> 8 [penwidth=3,colorscheme=set19,color="0;0.5:8"]
+	0 -> 8 [penwidth=3,colorscheme=set19,color="0;0.5:8"]
+	0 -> 1 [penwidth=3,colorscheme=set19,color="0;0.5:1"]
+	0 -> 3 [penwidth=3,colorscheme=set19,color="0;0.5:3"]
+	0 -> 2 [penwidth=3,colorscheme=set19,color="0;0.5:2"]
+}
