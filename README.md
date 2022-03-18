@@ -17,6 +17,11 @@ MACHINA is a computational framework for inferring migration patterns between a 
      * [Parsimonious Migration History](#pmh)
      * [Parsimonious Migration History with Tree Resolution](#pmh_tr)
      * [Parsimonious Migration History with Tree Inference](#pmh_ti)
+  3. [Python implementation](#python-implementation)
+     * [Python Dependencies](#python-dependencies)
+     * [Usage instructions](#usage)
+       - [I/O formats]($io)
+       -  [Parsimonious Migration History with Tree Resolution](#pmh_tr_py)
 
 <a name="installation"></a>
 ## Installation 
@@ -497,3 +502,118 @@ An example execution (executed from the root directory of the MACHINA repository
 
 The program `generatemutationtrees` uses the SPRUCE algorithm to enumerate all mutation trees given a frequency matrix. The program `pmh_ti` considers solves the PMH-TI problem for each enumerated mutation tree. The `results.txt` file is formatted in exactly the same way as in `pmh`.
 
+<a name="python"></a>
+## Python implementation
+
+Newest implementation of `pmh-tr` problem.
+
+<a name="python_dependencies"></a>
+### Python Dependencies
+
+* Python (3.7 or higher)
+* `NetworkX` (2.6.3 or higher)
+   Can be installed via `pip` or `conda`
+   ```
+   $ pip install networkx
+   $ ###### OR #####
+   $ conda install -c anaconda networkx
+   ```
+* Gurobi for python
+   Can be installed via `pip` or `conda`
+   ```
+   $ pip install gurobipy
+   $ ###### OR #####
+   $ conda install -c gurobi gurobi 
+   ```
+###  Usage
+
+#### I/O
+Same as the C++ version
+
+#### Parsimonius Migration History with Tree Resolution (PMH-TR)
+
+This implementation only deals with `PMH-TR` problem. In the parsimonious migration history with polytomy resolution we are given a clone tree T whose leaves are labeled by anatomical sites. The task is to find a refinement T' of T and label its inner vertices such that the resulting migration graph G has minimum migration number, comigration number and seeding site number. **Unlike the C++ version, the python version does not suppport constraints on the topology of the migration graph (migration patterns) yet.** So, G suppports all patterns like parallel source seeding, single or multi source seeding, or reseeding, but it cannot be constrained to follow a specific pattern among these.
+
+```
+usage: pmh_tr.py [-h] [-p PRIMARY] [-c COLORMAP] [--log] [-o OUTPUT]
+                 [-N NSOLUTIONS] [-C] [-t THREADS] [--print_suboptimal]
+                 [--print_model]
+                 clone_tree leaf_labeling
+
+PMH-TR
+
+positional arguments:
+  clone_tree            Input clone tree
+  leaf_labeling         Input leaf labeling
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PRIMARY, --primary PRIMARY
+                        Primary anatomical site
+  -c COLORMAP, --colormap COLORMAP
+                        Color map file
+  --log                 Outputs Gurobi logging
+  -o OUTPUT, --output OUTPUT
+                        Output folder
+  -N NSOLUTIONS, --nsolutions NSOLUTIONS
+                        Maximum number of solutions retained
+  -C, --count_solutions
+                        Only prints the number of solutions (default=False)
+  -t THREADS, --threads THREADS
+                        Number of threads
+  --print_suboptimal    Prints suboptimal solutions (default=False)
+  --print_model         Prints all the constraints
+```
+
+Notable changes from the C++ version
+* Faster
+* Adopts updated definition of comigration (if there are two migration events from $s$ to $t$, but they are in the same path from the root to a leaf in the refined tree, then they should be considered as two different comigration events).
+* Primary anatomical site is optional now - if not provided, the method will return the most optimal migration histories considering all possible primary sites.
+* Unlike C++ version, migration pattern cannot be specified. So all migration patterns are allwed (can be added if requested).
+* **Unlike the C++ version, there can be duplicate suboptimal solutions.** (a preprocessing step can be added to filter duplicate solutions if needed)
+* **The number of migrations, comigrations and seeding sites may not match with the output trees in suboptimal solutions.**
+* By default, it only prints and utputs the optimal trees. Need to use the flag `print_suboptimal` to get suboptimal trees.
+* Console output format and output file names will be slightly different (can be reverted back if needed).
+
+An example execution (executed from the root directory of the MACHINA repository):
+
+```
+$ python pmh_tr.py data/mcpherson_2016/patient4.tree data/mcpherson_2016/patient4.labeling\
+ -c data/mcpherson_2016/coloring.txt -o out -N 10 > results.txt
+
+$ cat results.txt
+ROv-    0       6       3       1       Optimal         0.3267354965209961
+RPv-    1       6       3       1       Optimal         0.3267354965209961
+LPv-    2       6       3       1       Optimal         0.3267354965209961
+LOv-    3       6       3       1       Optimal         0.3267354965209961
+```
+
+Each line lists an optimal solution found by `pmh_tr`. First the primary anatomical site is given, followed by the solution number, migration number, comigration number and seeding site number. Then it prints if the solution is optimal or not, and finally, the total running time in seconds is given. If not specified, `pmh_tr` will only return the optimal trees. To get the suboptimal trees, `--print_suboptimal` flag is needed.
+
+```
+$ python pmh_tr.py data/mcpherson_2016/patient4.tree data/mcpherson_2016/patient4.labeling\
+ -c data/mcpherson_2016/coloring.txt -o out -N 10 --print-suboptimal > results.txt
+
+$ cat results.txt
+ROv-    0       6       3       1       Optimal         0.19632220268249512
+LOv-    1       6       3       1       Optimal         0.19632220268249512
+LPv-    2       6       3       1       Optimal         0.19632220268249512
+RPv-    3       6       3       1       Optimal         0.19632220268249512
+RPv-    4       6       3       2       Suboptimal      0.19632220268249512
+LOv-    5       6       3       2       Suboptimal      0.19632220268249512
+LPv-    6       6       3       2       Suboptimal      0.19632220268249512
+LOv-    7       6       3       2       Suboptimal      0.19632220268249512
+LPv-    8       6       3       2       Suboptimal      0.19632220268249512
+ROv-    9       6       3       2       Suboptimal      0.19632220268249512
+```
+
+Like the C++ version, `-C` flag can be used to count the number of optimal solutions. 
+
+```
+$ python pmh_tr.py data/mcpherson_2016/patient4.tree data/mcpherson_2016/patient4.labeling\
+ -c data/mcpherson_2016/coloring.txt -o out -N 10 --print-suboptimal > results.txt
+
+$ cat results.txt
+ALL-    6       3       1       4
+```
+The output tells that `pmh_tr` found 4 optimal solutions with 6 migrations, 3 comigrations and 1 seeding site, when it considered ALL possible primary anatomical sites. 
