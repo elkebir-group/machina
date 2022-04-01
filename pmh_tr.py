@@ -18,9 +18,10 @@ def process_args():
     parser.add_argument('-N', '--nsolutions', type=int, help='Maximum number of solutions retained', default=10)
     parser.add_argument('-C', '--count_solutions', action='store_true', default=False, help='Only prints the number of solutions (default=False)')
     parser.add_argument('-t', '--threads', type=int, help='Number of threads')
-
-    parser.add_argument('--print_suboptimal', action='store_true', default=False, help='Prints suboptimal solutions (default=False)')
-    parser.add_argument('--print_model', action='store_true', default=False, help='Prints all the constraints')
+    parser.add_argument('-s', '--suboptimal', action='store_true', default=False, help='Returns suboptimal solutions without duplicates, \
+        may be slow (default=False)')
+    parser.add_argument('--print_model', action='store_true', default=False, help='Prints all the ILP constraints in human readable \
+        form (experimental, default=False)')
 
     return parser.parse_args()
 
@@ -28,7 +29,7 @@ def process_args():
 class CloneTree:
     
     def __init__(self, clone_tree_filename = None, leaf_labeling_filename = None, edges = None, labels = None, primary_site = None):
-        if edges is None:
+        if clone_tree_filename is not None:
             with open(clone_tree_filename, 'r') as clone_tree_file:
                 self.tree = nx.DiGraph()
                 for edge in clone_tree_file:
@@ -40,9 +41,9 @@ class CloneTree:
                 if not nx.is_tree(self.tree):
                     raise ValueError('Input clone tree is not a valid tree')
 
-            self.leaves = set([i for i in self.tree.nodes if self.tree.out_degree(i) == 0])
+            self.leaves = [i for i in self.tree.nodes if self.tree.out_degree(i) == 0]
             self.root = [i for i in self.tree.nodes if self.tree.in_degree(i) == 0][0]
-            self.sites = set()
+            self.sites = []
             with open(leaf_labeling_filename, 'r') as leaf_labeling_file:
                 attrs = dict()
                 for label in leaf_labeling_file:
@@ -51,7 +52,8 @@ class CloneTree:
                     except:
                         raise ValueError('Ill-formatted input leaf labeling file')
                     attrs[a] = {'label': l}
-                    self.sites.add(l)
+                    if l not in self.sites:
+                        self.sites.append(l)
             nx.set_node_attributes(self.tree, attrs)
             for leaf in self.leaves:
                 if 'label' not in self.tree.nodes[leaf]:
@@ -61,7 +63,6 @@ class CloneTree:
             else:
                 self.primary_site = primary_site
             self.n_sites = len(self.sites)
-            self.sites = list(self.sites)
         else:
             self.tree = nx.DiGraph()
             for edge in edges:
@@ -70,7 +71,7 @@ class CloneTree:
                 raise RuntimeError('Output is not a tree. Possible bug')
             nx.set_node_attributes(self.tree, labels)
             self.primary_site = primary_site
-            self.leaves = set([i for i in self.tree.nodes if self.tree.out_degree(i) == 0])
+            self.leaves = [i for i in self.tree.nodes if self.tree.out_degree(i) == 0]
             self.root = [i for i in self.tree.nodes if self.tree.in_degree(i) == 0][0]
 
         self.nodes = [v for v in self.tree.nodes]
@@ -78,6 +79,7 @@ class CloneTree:
 
         self.n_nodes = len(self.nodes)
         self.n_edges = len(self.edges)
+        self.n_leaves = len(self.leaves)
 
     def get_label(self, node):
         return self.tree.nodes[node]['label']
@@ -87,6 +89,17 @@ class CloneTree:
 
     def get_children_arcs(self, node):
         return [k for k in self.tree.out_edges(nbunch=node)]
+
+    def infer_paths(self):
+        self.paths = {}
+        self.max_height = 0
+        for u in self.leaves:
+            self.paths[u] = []
+            path_u = nx.shortest_path(self.tree, self.root, u)
+            for ii in range(len(path_u) - 1):
+                self.paths[u].append( (path_u[ii], path_u[ii+1]) )
+            if len(self.paths[u]) > self.max_height:
+                self.max_height = len(self.paths[u])
 
     def write_dot(self, filename, colormap=None):
         with open(filename, 'w+') as f:
@@ -104,7 +117,8 @@ class CloneTree:
                     node_edge_index[v] = ind
                     ind += 1
             for i,j in self.tree.edges:
-                f.write(f'\t{node_edge_index[i]} -> {node_edge_index[j]} [penwidth=3,colorscheme=set19,color=\"{colormap[self.get_label(i)]};0.5:{colormap[self.get_label(j)]}\"]\n')
+                f.write(f'\t{node_edge_index[i]} -> {node_edge_index[j]} [penwidth=3,colorscheme=set19,' + 
+                    f'color=\"{colormap[self.get_label(i)]};0.5:{colormap[self.get_label(j)]}\"]\n')
             f.write('}\n')
 
     def write_tree(self, filename):
@@ -120,23 +134,15 @@ class CloneTree:
 
 class ILPSolver:
 
-    def __init__(self, clone_tree, nSolutions, logfile=None, n_threads=None):
+    def __init__(self, clone_tree, nSolutions, logfile=None, n_threads=None, suboptimal_mode = False):
         self.clone_tree = clone_tree
         self.nSolutions = nSolutions
+        self.clone_tree.infer_paths()
 
-        self.node_edge_index = {}
-        ind_count = 0
-        for node in clone_tree.nodes:
-            self.node_edge_index[node] = ind_count
-            ind_count += 1
-        for edge in clone_tree.edges:
-            self.node_edge_index[edge] = ind_count
-            ind_count += 1
-        self.site_index = {}
-        ind_count = 0
-        for site in clone_tree.sites:
-            self.site_index[site] = ind_count
-            ind_count += 1
+        self.node_edge_index = { p:i for i,p in enumerate(clone_tree.nodes + clone_tree.edges) }
+        self.site_index = { p:i for i,p in enumerate(clone_tree.sites) }
+        if suboptimal_mode:
+            self.leaf_index = { p:i for i,p in enumerate(clone_tree.leaves) }
 
         self.m = gp.Model('ILP')
         self.m._logfile = logfile
@@ -146,12 +152,18 @@ class ILPSolver:
             self.m.setParam(GRB.Param.Threads, n_threads)
 
         self.add_ILP_vars()
+        if suboptimal_mode:
+            self.add_extra_vars_suboptimal()
         self.add_leaf_constraints()
         self.add_polytomy_resolution_compatibility_constraint()
         self.add_original_edges_compatibility_constraint()
         self.add_constraints_for_p()
-        self.add_constraints_for_z()
-        self.add_constraints_for_q()
+        if not suboptimal_mode:
+            self.add_constraints_for_z()
+            self.add_constraints_for_q()
+        else:
+            self.add_constraints_for_z_b_R_suboptimal()
+            self.add_constraints_for_q_suboptimal()
         self.add_constraints_binary()
         if clone_tree.primary_site != None:
             self.add_primary_site_constraints()
@@ -160,6 +172,7 @@ class ILPSolver:
 
         self.m.setParam(GRB.Param.PoolSolutions, nSolutions)
         self.m.setParam(GRB.Param.PoolSearchMode, 2)
+        self.m.setParam(GRB.Param.MIPGap, 0)
 
         start_time = time.time()
         self.m.optimize()
@@ -170,10 +183,15 @@ class ILPSolver:
 
     def add_ILP_vars(self):
         self.l = self.m.addMVar((self.clone_tree.n_nodes, self.clone_tree.n_sites), vtype=GRB.BINARY, name="l")
-        self.g = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites, self.clone_tree.n_edges + self.clone_tree.n_nodes), vtype=GRB.BINARY, name="g")
+        self.g = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites, self.clone_tree.n_edges + self.clone_tree.n_nodes), \
+            vtype=GRB.BINARY, name="g")
         self.z = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites), vtype=GRB.INTEGER , name="z")
         self.q = self.m.addMVar(self.clone_tree.n_sites, vtype=GRB.BINARY, name="q")
         self.p = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites, self.clone_tree.n_edges), vtype=GRB.BINARY, name="p")
+
+    def add_extra_vars_suboptimal(self):
+        self.R = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites, len(self.clone_tree.leaves) ), vtype=GRB.BINARY, name="R")
+        self.b = self.m.addMVar((self.clone_tree.n_sites, self.clone_tree.n_sites, len(self.clone_tree.leaves) ), vtype=GRB.BINARY, name="b")
 
     def add_leaf_constraints(self):
         for i in range(self.clone_tree.n_nodes):
@@ -260,27 +278,61 @@ class ILPSolver:
         for s in range(self.clone_tree.n_sites):
             for t in range(self.clone_tree.n_sites):
                 if s != t:
-                    for i in range(self.clone_tree.n_nodes+self.clone_tree.n_edges):
-                        self.m.addConstr(self.z[s,t]>=self.g[s,t,i])
-                    for u in range(self.clone_tree.n_nodes):
+                    for k in range(self.clone_tree.n_leaves):
                         sum = 0
-                        if self.clone_tree.nodes[u] in self.clone_tree.leaves:
-                            path_u = nx.shortest_path(self.clone_tree.tree, self.clone_tree.root, self.clone_tree.nodes[u])
-                            for ii in range(len(path_u) - 1):
-                                sum += self.g[ s,t,self.node_edge_index[ (path_u[ii], path_u[ii+1]) ] ]
-                                sum += self.p[ s,t,self.node_edge_index[ (path_u[ii], path_u[ii+1]) ] - self.clone_tree.n_nodes ]
+                        path_k = self.clone_tree.paths[self.clone_tree.leaves[k]]
+                        for uv in path_k:
+                            sum += self.g[ s,t,self.node_edge_index[ uv ] ]
+                            sum += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
                         self.m.addConstr( self.z[s,t] >= sum )
                 else:
                     self.m.addConstr(self.z[s,t]==0)
 
+    def add_constraints_for_z_b_R_suboptimal(self):
+        for s in range(self.clone_tree.n_sites):
+            for t in range(self.clone_tree.n_sites):
+                if s != t:
+                    sum2 = 0
+                    sum3 = 0
+                    for k in range(self.clone_tree.n_leaves):
+                        sum = 0
+                        path_k = self.clone_tree.paths[self.clone_tree.leaves[k]]
+                        for uv in path_k:
+                            sum += self.g[ s,t,self.node_edge_index[ uv ] ]
+                            sum += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
+                        self.m.addConstr( self.z[s,t] >= sum )
+                        self.m.addConstr( self.z[s,t] <= sum +  self.clone_tree.max_height * (1 - self.b[ s,t,k ]))
+                        self.m.addConstr( self.z[ s,t ] - sum >= 1 - self.R[ s,t,k ] )
+                        self.m.addConstr( self.z[ s,t ] - sum <= self.clone_tree.max_height * (1 - self.R[ s,t,k ]) )
+
+                        sum2 += self.b[ s,t,k ]
+                        self.m.addConstr( self.b[ s,t,k ] >= self.R[ s,t,k ] - sum3 )
+                        sum3 += self.R[ s,t,k ]
+                    self.m.addConstr( sum2 == 1 )
+                else:
+                    self.m.addConstr(self.z[s,t]==0)
+                    for k in range(self.clone_tree.n_leaves):
+                        self.m.addConstr(self.R[ s,t,k ] == 0)
+                        self.m.addConstr(self.b[ s,t,k ] == 0)
+
     def add_constraints_for_q(self):
-        for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
-            for s in range(self.clone_tree.n_sites):
-                for t in range(self.clone_tree.n_sites):
-                    if s != t:
-                        self.m.addConstr( self.q[s] >= self.g[ s,t,i ] )
         for s in range(self.clone_tree.n_sites):
             self.m.addConstr( self.q[s] <= 1 )
+            for t in range(self.clone_tree.n_sites):
+                if s != t:
+                    for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
+                        self.m.addConstr( self.q[s] >= self.g[ s,t,i ] )
+
+    def add_constraints_for_q_suboptimal(self):
+        for s in range(self.clone_tree.n_sites):
+            self.m.addConstr( self.q[s] <= 1 )
+            sum = 0
+            for t in range(self.clone_tree.n_sites):
+                if s != t:
+                    for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
+                        self.m.addConstr( self.q[s] >= self.g[ s,t,i ] )
+                        sum += self.g[ s,t,i ]
+            self.m.addConstr( self.q[s] <= sum)
 
     def add_constraints_binary(self):
         for i in range(self.clone_tree.n_nodes):
@@ -293,15 +345,11 @@ class ILPSolver:
             else:
                 for s in range(self.clone_tree.n_sites):
                     sum = 0
-                    # conststr=''
                     for t in range(self.clone_tree.n_sites):
                         sum += self.g[s,t,i]
-                        # conststr += f'+ g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}]'
                         for ij in delta_i:
                             sum += self.g[s,t,self.node_edge_index[ij]]
-                            # conststr += f'+ g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{ij}]'
                     self.m.addConstr(sum >= 2 * self.l[i,s])
-                    # print('puko'+conststr+'>=2')
 
     def add_primary_site_constraints(self):
         self.m.addConstr(self.l[self.node_edge_index[clone_tree.root], self.site_index[clone_tree.primary_site]] == 1)
@@ -326,12 +374,8 @@ class ILPSolver:
         for s in range(self.clone_tree.n_sites):
             sum3 += self.q[s]
 
-        sum4 = 0
-        for i in range(self.clone_tree.n_nodes):
-            for s in range(self.clone_tree.n_sites):
-                sum4 += self.l[i,s]
-
-        self.m.setObjective( ( (self.clone_tree.n_sites ** 2) * (self.clone_tree.n_sites + 1) ) * sum1 + (self.clone_tree.n_sites + 1) * sum2 + sum3, GRB.MINIMIZE)
+        self.m.setObjective( ( (self.clone_tree.n_sites ** 2) * (self.clone_tree.n_sites + 1) ) * sum1 + (self.clone_tree.n_sites + 1) \
+            * sum2 + sum3, GRB.MINIMIZE)
 
     def compute_summary(self, soln_ind=None):
         if soln_ind == None:
@@ -357,7 +401,7 @@ class ILPSolver:
     def count_optimal_solution(self):
         self.m.setParam(GRB.Param.SolutionNumber, 0)
         best_obj_val = self.m.PoolObjVal
-        for e in range(self.nSolutions):
+        for e in range(self.nActualSolutions):
             self.m.setParam(GRB.Param.SolutionNumber, e)
             if self.m.PoolObjVal - best_obj_val > 0.5:
                 return e
@@ -378,8 +422,10 @@ class ILPSolver:
             for s in range(self.clone_tree.n_sites):
                 for t in range(self.clone_tree.n_sites):
                     if s != t:
-                        print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] <= l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}]' )
-                        print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] <= l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[t]}]' )
+                        print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] <= '
+                            f'l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}]' )
+                        print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] <= '
+                            f'l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[t]}]' )
                     else:
                         print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] == 0')
 
@@ -389,9 +435,11 @@ class ILPSolver:
                 conststr2 = ''
                 for t in range(self.clone_tree.n_sites):
                     if s != t:
-                        conststr += f'+ g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + g[{self.clone_tree.sites[t]},{self.clone_tree.sites[s]},{self.clone_tree.nodes[i]}]'
+                        conststr += f'+ g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + ' +\
+                            f'g[{self.clone_tree.sites[t]},{self.clone_tree.sites[s]},{self.clone_tree.nodes[i]}]'
                         conststr2 += f'+ l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[t]}]'
-                print( f'{self.clone_tree.n_sites} * ({conststr}) >=  ({conststr2}) + {self.clone_tree.n_sites} * l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}] - {self.clone_tree.n_sites}')
+                print( f'{self.clone_tree.n_sites} * ({conststr}) >=  ({conststr2}) + {self.clone_tree.n_sites} * '
+                    f'l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}] - {self.clone_tree.n_sites}')
 
         for i in range(self.clone_tree.n_nodes):
             conststr = ''
@@ -417,8 +465,10 @@ class ILPSolver:
                 for ij in range(self.clone_tree.n_edges):
                     i = self.node_edge_index[self.clone_tree.edges[ij][0]]
                     j = self.node_edge_index[self.clone_tree.edges[ij][1]]
-                    print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}]' )
-                    print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= l[{self.clone_tree.nodes[j]},{self.clone_tree.sites[t]}]' )
+                    print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= '
+                        f'l[{self.clone_tree.nodes[i]},{self.clone_tree.sites[s]}]' )
+                    print( f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= '
+                        f'l[{self.clone_tree.nodes[j]},{self.clone_tree.sites[t]}]' )
         
         for ij in range(self.clone_tree.n_edges):
             conststr = ''
@@ -436,10 +486,37 @@ class ILPSolver:
                     for t_prime in range(self.clone_tree.n_sites):
                         conststr += f'+ g[{self.clone_tree.sites[t]},{self.clone_tree.sites[t_prime]},{self.clone_tree.edges[ij]}]'
                         conststr2 += f'+ p[{self.clone_tree.sites[t]}, {self.clone_tree.sites[t_prime]}, {self.clone_tree.edges[ij]}]'
-                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] >= g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + {conststr} - 1')
-                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] >= g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + {conststr2} - 1')
-                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}]')
-                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= {conststr} + {conststr2}')
+                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] >= '
+                        f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + {conststr} - 1')
+                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] >= '
+                        f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}] + {conststr2} - 1')
+                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] <= '
+                        f'g[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]}]')
+                    print( f'p[{self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[ij]}] '
+                        f'<= {conststr} + {conststr2}')
+
+        for s in range(self.clone_tree.n_sites):
+            conststr = ''
+            for t in range(self.clone_tree.n_sites):
+                if s != t:
+                    for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
+                        if i < self.clone_tree.n_nodes:
+                            print( f'q[{self.clone_tree.sites[s]}] >= g[ {self.clone_tree.sites[s]},{self.clone_tree.sites[t]},'
+                                f'{self.clone_tree.nodes[i]} ]' )
+                            conststr += f'+ g[ {self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.nodes[i]} ]'
+                        else:
+                            print( f'q[{self.clone_tree.sites[s]}] >= g[ {self.clone_tree.sites[s]},{self.clone_tree.sites[t]},'
+                                f'{self.clone_tree.edges[i - self.clone_tree.n_nodes]} ]' )
+                            conststr += f'+ g[ {self.clone_tree.sites[s]},{self.clone_tree.sites[t]},{self.clone_tree.edges[i - self.clone_tree.n_nodes]} ]'
+            print( f'q[{self.clone_tree.sites[s]}] <= {conststr}')
+        for s in range(self.clone_tree.n_sites):
+            print( f'q[{self.clone_tree.sites[s]}] <= 1' )
+        
+        print(f'l[{clone_tree.root}, {clone_tree.primary_site}] == 1')
+        conststr = ''
+        for s in range(self.clone_tree.n_sites):
+            conststr += f'+ g[{self.clone_tree.sites[s]}, {clone_tree.primary_site}, {clone_tree.root}]'
+        print(f'{conststr} == 0')
         
     def print_solution(self, e):
         print('soln num - '+ str(e))
@@ -512,13 +589,15 @@ class ILPSolver:
         with open(filename, 'w+') as f:
             f.write('digraph G {\n')
             for s in range(self.clone_tree.n_sites):
-                f.write(f'\t{s} [shape=box,penwidth=3,colorscheme=set19,color={colormap[self.clone_tree.sites[s]]},label="{self.clone_tree.sites[s]}"]\n')
+                f.write(f'\t{s} [shape=box,penwidth=3,colorscheme=set19,color={colormap[self.clone_tree.sites[s]]},' + 
+                    f'label="{self.clone_tree.sites[s]}"]\n')
             for s in range(self.clone_tree.n_sites):
                 for t in range(self.clone_tree.n_sites):
                     if s != t:
                         for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
                             if self.g[s,t,i].Xn > 0.5:
-                                f.write(f'\t{s} -> {t} [penwidth=3,colorscheme=set19,color="{colormap[self.clone_tree.sites[s]]};0.5:{colormap[self.clone_tree.sites[t]]}"]\n')
+                                f.write(f'\t{s} -> {t} [penwidth=3,colorscheme=set19,' +
+                                    f'color="{colormap[self.clone_tree.sites[s]]};0.5:{colormap[self.clone_tree.sites[t]]}"]\n')
             f.write('}\n')
 
 
@@ -545,31 +624,36 @@ if __name__ == '__main__':
         output_str = args.output
         if not os.path.exists(output_str):
             os.makedirs(output_str)
-    if args.log == True:
-        if args.primary is None:
-            logfile = f'{output_str}/ALL-log.txt'
-        else:
-            logfile = f'{output_str}/{args.primary}-log.txt'
-    else:
-        logfile = '/dev/null'
 
-    soln = ILPSolver(clone_tree, args.nsolutions, logfile=logfile, n_threads=args.threads)
+    if args.primary is None:
+        primary_str = 'ALL'
+    else:
+        primary_str = args.primary
+
+    if args.log == True:
+        logfile = f'{output_str}/{primary_str}-log.txt'
+    else:
+        logfile = ''
+
+    soln = ILPSolver(clone_tree, args.nsolutions, logfile=logfile, n_threads=args.threads, suboptimal_mode = args.suboptimal)
 
     if args.print_model:
         soln.print_model()
 
     if args.count_solutions == True:
-        if args.primary is None:
-            print(f'ALL-\t{int(soln.n_migrations)}\t{int(soln.n_comigrations)}\t{int(soln.n_seeding_sites)}\t{soln.count_optimal_solution()}')
-        else:
-            print(f'{args.primary}-\t{int(soln.n_migrations)}\t{int(soln.n_comigrations)}\t{int(soln.n_seeding_sites)}\t{soln.count_optimal_solution()}')
+        print(f'{primary_str}-\t{int(soln.n_migrations)}\t{int(soln.n_comigrations)}\t{int(soln.n_seeding_sites)}\t\
+                {soln.count_optimal_solution()}')
     else:
         colormap = process_colormap(colormap_filename=args.colormap, clone_tree=clone_tree)
         optimal_count = soln.count_optimal_solution()
 
-        if args.print_suboptimal == True:
+        if args.suboptimal:
             padding = len(str(soln.nActualSolutions))
-            for e in range(soln.nActualSolutions):
+        else:
+            padding = len(str(optimal_count))
+
+        for e in range(soln.nActualSolutions):
+            if args.suboptimal or e < optimal_count:
                 T_prime = soln.refine_tree(e)
                 primary_str = T_prime.get_label(T_prime.root)
                 T_prime.write_dot(f'{output_str}/{primary_str}-T-{str(e).zfill(padding)}.dot', colormap=colormap)
@@ -581,15 +665,5 @@ if __name__ == '__main__':
                     print(f'{primary_str}-\t{e}\t{summary[0]}\t{summary[1]}\t{summary[2]}\tOptimal\t\t{soln.total_time}')
                 else:
                     print(f'{primary_str}-\t{e}\t{summary[0]}\t{summary[1]}\t{summary[2]}\tSuboptimal\t{soln.total_time}')
-        else:
-            padding = len(str(optimal_count))
-            for e in range(optimal_count):
-                T_prime = soln.refine_tree(e)
-                #soln.print_solution(e)
-                primary_str = T_prime.get_label(T_prime.root)
-                T_prime.write_dot(f'{output_str}/{primary_str}-T-{str(e).zfill(padding)}.dot', colormap)
-                T_prime.write_tree(f'{output_str}/{primary_str}-T-{str(e).zfill(padding)}.tree')
-                T_prime.write_labeling(f'{output_str}/{primary_str}-T-{str(e).zfill(padding)}.labeling')
-                soln.write_G_dot(e, f'{output_str}/{primary_str}-G-{str(e).zfill(padding)}.dot', colormap)
-                summary = soln.compute_summary(soln_ind=e)
-                print(f'{primary_str}-\t{e}\t{summary[0]}\t{summary[1]}\t{summary[2]}\tOptimal\t\t{soln.total_time}')
+            else:
+                break
