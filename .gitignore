@@ -41,3 +41,8 @@ build2/
 .DS_store
 .vscode
 
+# Test dataset
+mydata/
+
+# result files
+res/

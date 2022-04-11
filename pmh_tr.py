@@ -215,11 +215,22 @@ class ILPSolver:
                     sum += self.g[s,t,i]
             self.m.addConstr( sum == sum2 - 1 )
 
+        # for i in range(self.clone_tree.n_nodes):
+        #     for s in range(self.clone_tree.n_sites):
+        #         sum = 0
+        #         for t in range(self.clone_tree.n_sites):
+        #             sum += self.g[t,s,i]
+        #         self.m.addConstr(sum <= self.l[i,s])
+
         for i in range(self.clone_tree.n_nodes):
             for s in range(self.clone_tree.n_sites):
+                if self.clone_tree.nodes[i] != self.clone_tree.root:
+                    pii = self.node_edge_index[self.clone_tree.get_parent_arc(self.clone_tree.nodes[i])]
                 sum = 0
                 for t in range(self.clone_tree.n_sites):
                     sum += self.g[t,s,i]
+                    if self.clone_tree.nodes[i] != self.clone_tree.root:
+                        sum += self.g[t,s,pii]
                 self.m.addConstr(sum <= self.l[i,s])
 
     def add_original_edges_compatibility_constraint(self):
