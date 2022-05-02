@@ -36,7 +36,10 @@ def print_x_florets(nvars, treefile, lfile):
 
 def print_clause_florets(clauses, treefile, lfile):
     for i in range(len(clauses)):
-        treefile.write(f'RR c1_{i}\n')
+        treefile.write(f'RR c0_{i}\n')
+        treefile.write(f'c0_{i} c1_{i}\n')
+        treefile.write(f'c0_{i} c0l_{i}\n')
+        lfile.write(f'c0l_{i} R\n')
         treefile.write(f'c1_{i} c5_{i}\n')
         treefile.write(f'c5_{i} c5l_{i}\n')
         lfile.write(f'c5l_{i} C{i}\n')
@@ -59,6 +62,58 @@ def print_clause_florets(clauses, treefile, lfile):
             lfile.write(f'c6{j}ll_{i} {clauses[i][j]}\n')
             lfile.write(f'c6{j}lr_{i} C{i}\n')
 
+def print_other_clause_florets(clauses, treefile, lfile):
+    comb = [(0,1),(0,2),(1,2)]
+    for i in range(len(clauses)):
+        for k in range(3):
+            treefile.write(f'RR c-{k}-0_{i}\n')
+            treefile.write(f'c-{k}-0_{i} c-{k}-1_{i}\n')
+            treefile.write(f'c-{k}-0_{i} c-{k}-0l_{i}\n')
+            lfile.write(f'c-{k}-0l_{i} R\n')
+            treefile.write(f'c-{k}-1_{i} c-{k}-5_{i}\n')
+            treefile.write(f'c-{k}-5_{i} c-{k}-5l_{i}\n')
+            lfile.write(f'c-{k}-5l_{i} C-{k}-{i}\n')
+            treefile.write(f'c-{k}-1_{i} c-{k}-2_{i}\n')
+            treefile.write(f'c-{k}-2_{i} c-{k}-2l_{i}\n')
+            lfile.write(f'c-{k}-2l_{i} C-{k}-{i}\n')
+            treefile.write(f'c-{k}-2_{i} c-{k}-3_{i}\n')
+            for j in range(2):
+                treefile.write(f'c-{k}-3_{i} c-{k}-3{j}_{i}\n')
+                treefile.write(f'c-{k}-3{j}_{i} c-{k}-3{j}ll_{i}\n')
+                treefile.write(f'c-{k}-3{j}_{i} c-{k}-3{j}lr_{i}\n')
+                lfile.write(f'c-{k}-3{j}ll_{i} {clauses[i][comb[k][j]]}\n')
+                lfile.write(f'c-{k}-3{j}lr_{i} {-clauses[i][comb[k][j]]}\n')
+                treefile.write(f'c-{k}-5_{i} c-{k}-6{j}_{i}\n')
+                treefile.write(f'c-{k}-6{j}_{i} c-{k}-6{j}ll_{i}\n')
+                treefile.write(f'c-{k}-6{j}_{i} c-{k}-6{j}lr_{i}\n')
+                lfile.write(f'c-{k}-6{j}ll_{i} {-clauses[i][comb[k][j]]}\n')
+                lfile.write(f'c-{k}-6{j}lr_{i} C-{k}-{i}\n')
+
+def print_clause_florets2(clauses, treefile, lfile):
+    for i in range(len(clauses)):
+        treefile.write(f'RR c1_{i}\n')
+        treefile.write(f'c1_{i} c5_{i}\n')
+        treefile.write(f'c5_{i} c5l_{i}\n')
+        lfile.write(f'c5l_{i} C{i}\n')
+        treefile.write(f'c5_{i} c6_{i}\n')
+        treefile.write(f'c6_{i} c6l_{i}\n')
+        lfile.write(f'c6l_{i} C{i}\n')
+        treefile.write(f'c1_{i} c2_{i}\n')
+        treefile.write(f'c2_{i} c2l_{i}\n')
+        lfile.write(f'c2l_{i} C{i}\n')
+        treefile.write(f'c2_{i} c3_{i}\n')
+        for j in range(3):
+            treefile.write(f'c3_{i} c3{j}_{i}\n')
+            treefile.write(f'c3{j}_{i} c3{j}ll_{i}\n')
+            treefile.write(f'c3{j}_{i} c3{j}lr_{i}\n')
+            lfile.write(f'c3{j}ll_{i} {clauses[i][j]}\n')
+            lfile.write(f'c3{j}lr_{i} {-clauses[i][j]}\n')
+            # treefile.write(f'c5_{i} c6{j}_{i}\n')
+            treefile.write(f'c6_{i} c6{j}_{i}\n')
+            # treefile.write(f'c6{j}_{i} c6{j}lr_{i}\n')
+            lfile.write(f'c6{j}_{i} {clauses[i][j]}\n')
+            # lfile.write(f'c6{j}lr_{i} C{i}\n')
+
 
 if __name__ == '__main__':
     nvars, clauses = read_file(sys.argv[1])
@@ -68,5 +123,6 @@ if __name__ == '__main__':
 
         print_x_florets(nvars, treefile, lfile)
         print_clause_florets(clauses, treefile, lfile)
+        print_other_clause_florets(clauses, treefile, lfile)
     
 

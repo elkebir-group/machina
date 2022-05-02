@@ -198,11 +198,26 @@ class ILPSolver:
             if self.clone_tree.nodes[i] in self.clone_tree.leaves:
                 hat_ell_i = self.site_index[self.clone_tree.get_label(self.clone_tree.nodes[i])]
                 self.m.addConstr( self.l[ i, hat_ell_i ] == 1 )
-                sum = 0
+                sum1 = 0
                 for s in range(self.clone_tree.n_sites):
                     if s != hat_ell_i:
-                        sum += self.l[ i, s ]
-                self.m.addConstr(sum == 0)
+                        sum1 += self.l[ i, s ]
+                self.m.addConstr(sum1 == 0)
+
+    def add_constraints_for_p(self):
+        for s in range(self.clone_tree.n_sites):
+            for t in range(self.clone_tree.n_sites):
+                for ij in range(self.clone_tree.n_edges):
+                    i = self.node_edge_index[self.clone_tree.edges[ij][0]]
+                    sum1 = 0
+                    sum2 = 0
+                    for t_prime in range(self.clone_tree.n_sites):
+                        sum1 += self.g[t,t_prime,self.clone_tree.n_nodes + ij]
+                        sum2 += self.p[t, t_prime, ij]
+                    self.m.addConstr( self.p[s,t,ij] >= self.g[s,t,i] + sum1 - 1)
+                    self.m.addConstr( self.p[s,t,ij] >= self.g[s,t,i] + sum2 - 1)
+                    self.m.addConstr( self.p[s,t,ij] <= self.g[s,t,i])
+                    self.m.addConstr( self.p[s,t,ij] <= sum1 + sum2)
 
     def add_polytomy_resolution_compatibility_constraint(self):
         for i in range(self.clone_tree.n_nodes):
@@ -216,40 +231,55 @@ class ILPSolver:
 
         for i in range(self.clone_tree.n_nodes):
             for s in range(self.clone_tree.n_sites):
-                sum = 0
-                sum2 = 0
+                if self.clone_tree.nodes[i] != self.clone_tree.root:
+                    pii = self.node_edge_index[self.clone_tree.get_parent_arc(self.clone_tree.nodes[i])]
+                sum1 = 0
                 for t in range(self.clone_tree.n_sites):
-                    if s != t:
-                        sum += self.g[s,t,i] + self.g[t,s,i]
-                        sum2 += self.l[i,t]
-                self.m.addConstr( self.clone_tree.n_sites * sum >=  sum2 + self.clone_tree.n_sites * self.l[i,s] - self.clone_tree.n_sites)
+                    sum1 += self.g[t,s,i]
+                    if self.clone_tree.nodes[i] != self.clone_tree.root:
+                        sum1 += self.g[t,s,pii]
+                self.m.addConstr(sum1 <= self.l[i,s])
 
         for i in range(self.clone_tree.n_nodes):
-            sum = 0
+            sum1 = 0
             sum2 = 0
             for s in range(self.clone_tree.n_sites):
                 sum2 += self.l[i,s]
                 for t in range(self.clone_tree.n_sites):
-                    sum += self.g[s,t,i]
-            self.m.addConstr( sum == sum2 - 1 )
+                    sum1 += self.g[s,t,i]
+            self.m.addConstr( sum1 == sum2 - 1 )
 
-        # for i in range(self.clone_tree.n_nodes):
-        #     for s in range(self.clone_tree.n_sites):
-        #         sum = 0
-        #         for t in range(self.clone_tree.n_sites):
-        #             sum += self.g[t,s,i]
-        #         self.m.addConstr(sum <= self.l[i,s])
+        for s in range(self.clone_tree.n_sites):
+            for ij in range(self.clone_tree.n_edges):
+                sum1 = 0
+                sum2 = 0
+                for t in range(self.clone_tree.n_sites):
+                    sum1 += self.g[s,t,self.clone_tree.n_nodes + ij]
+                    sum2 += self.p[s, t, ij]
+                self.m.addConstr( sum1 + sum2 <= 1 )
 
         for i in range(self.clone_tree.n_nodes):
             for s in range(self.clone_tree.n_sites):
                 if self.clone_tree.nodes[i] != self.clone_tree.root:
                     pii = self.node_edge_index[self.clone_tree.get_parent_arc(self.clone_tree.nodes[i])]
-                sum = 0
+                delta_i = self.clone_tree.get_children_arcs(self.clone_tree.nodes[i])
+                sum1 = 0
                 for t in range(self.clone_tree.n_sites):
-                    sum += self.g[t,s,i]
                     if self.clone_tree.nodes[i] != self.clone_tree.root:
-                        sum += self.g[t,s,pii]
-                self.m.addConstr(sum <= self.l[i,s])
+                        sum1 += self.g[ t,s,pii ]
+                    for ij in delta_i:
+                        sum1 += self.g[s, t, self.node_edge_index[ij]]
+                self.m.addConstr( sum1 >= self.l[i, s] )
+
+        for i in range(self.clone_tree.n_nodes):
+            for s in range(self.clone_tree.n_sites):
+                sum1 = 0
+                sum2 = 0
+                for t in range(self.clone_tree.n_sites):
+                    if s != t:
+                        sum1 += self.g[s,t,i] + self.g[t,s,i]
+                        sum2 += self.l[i,t]
+                self.m.addConstr( self.clone_tree.n_sites * sum1 >=  sum2 + self.clone_tree.n_sites * self.l[i,s] - self.clone_tree.n_sites)
 
     def add_original_edges_compatibility_constraint(self):
         for s in range(self.clone_tree.n_sites):
@@ -261,41 +291,26 @@ class ILPSolver:
                     self.m.addConstr( self.g[s,t,self.clone_tree.n_nodes + ij] <= self.l[j,t] )
 
         for ij in range(self.clone_tree.n_edges):
-            sum = 0
+            sum1 = 0
             for s in range(self.clone_tree.n_sites):
                 for t in range(self.clone_tree.n_sites):
-                    sum += self.g[s,t,self.clone_tree.n_nodes + ij]
-            self.m.addConstr( sum == 1 )
+                    sum1 += self.g[s,t,self.clone_tree.n_nodes + ij]
+            self.m.addConstr( sum1 == 1 )
 
     def add_refinement_constraint(self):
         pass
-
-    def add_constraints_for_p(self):
-        for s in range(self.clone_tree.n_sites):
-            for t in range(self.clone_tree.n_sites):
-                for ij in range(self.clone_tree.n_edges):
-                    i = self.node_edge_index[self.clone_tree.edges[ij][0]]
-                    sum = 0
-                    sum2 = 0
-                    for t_prime in range(self.clone_tree.n_sites):
-                        sum += self.g[t,t_prime,self.clone_tree.n_nodes + ij]
-                        sum2 += self.p[t, t_prime, ij]
-                    self.m.addConstr( self.p[s,t,ij] >= self.g[s,t,i] + sum - 1)
-                    self.m.addConstr( self.p[s,t,ij] >= self.g[s,t,i] + sum2 - 1)
-                    self.m.addConstr( self.p[s,t,ij] <= self.g[s,t,i])
-                    self.m.addConstr( self.p[s,t,ij] <= sum + sum2)
 
     def add_constraints_for_z(self):
         for s in range(self.clone_tree.n_sites):
             for t in range(self.clone_tree.n_sites):
                 if s != t:
                     for k in range(self.clone_tree.n_leaves):
-                        sum = 0
+                        sum1 = 0
                         path_k = self.clone_tree.paths[self.clone_tree.leaves[k]]
                         for uv in path_k:
-                            sum += self.g[ s,t,self.node_edge_index[ uv ] ]
-                            sum += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
-                        self.m.addConstr( self.z[s,t] >= sum )
+                            sum1 += self.g[ s,t,self.node_edge_index[ uv ] ]
+                            sum1 += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
+                        self.m.addConstr( self.z[s,t] >= sum1 )
                 else:
                     self.m.addConstr(self.z[s,t]==0)
 
@@ -306,15 +321,15 @@ class ILPSolver:
                     sum2 = 0
                     sum3 = 0
                     for k in range(self.clone_tree.n_leaves):
-                        sum = 0
+                        sum1 = 0
                         path_k = self.clone_tree.paths[self.clone_tree.leaves[k]]
                         for uv in path_k:
-                            sum += self.g[ s,t,self.node_edge_index[ uv ] ]
-                            sum += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
-                        self.m.addConstr( self.z[s,t] >= sum )
-                        self.m.addConstr( self.z[s,t] <= sum +  self.clone_tree.max_height * (1 - self.b[ s,t,k ]))
-                        self.m.addConstr( self.z[ s,t ] - sum >= 1 - self.R[ s,t,k ] )
-                        self.m.addConstr( self.z[ s,t ] - sum <= self.clone_tree.max_height * (1 - self.R[ s,t,k ]) )
+                            sum1 += self.g[ s,t,self.node_edge_index[ uv ] ]
+                            sum1 += self.p[ s,t,self.node_edge_index[ uv ] - self.clone_tree.n_nodes ]
+                        self.m.addConstr( self.z[s,t] >= sum1 )
+                        self.m.addConstr( self.z[s,t] <= sum1 +  self.clone_tree.max_height * (1 - self.b[ s,t,k ]))
+                        self.m.addConstr( self.z[ s,t ] - sum1 >= 1 - self.R[ s,t,k ] )
+                        self.m.addConstr( self.z[ s,t ] - sum1 <= self.clone_tree.max_height * (1 - self.R[ s,t,k ]) )
 
                         sum2 += self.b[ s,t,k ]
                         self.m.addConstr( self.b[ s,t,k ] >= self.R[ s,t,k ] - sum3 )
@@ -337,37 +352,37 @@ class ILPSolver:
     def add_constraints_for_q_suboptimal(self):
         for s in range(self.clone_tree.n_sites):
             self.m.addConstr( self.q[s] <= 1 )
-            sum = 0
+            sum1 = 0
             for t in range(self.clone_tree.n_sites):
                 if s != t:
                     for i in range(self.clone_tree.n_nodes + self.clone_tree.n_edges):
                         self.m.addConstr( self.q[s] >= self.g[ s,t,i ] )
-                        sum += self.g[ s,t,i ]
-            self.m.addConstr( self.q[s] <= sum)
+                        sum1 += self.g[ s,t,i ]
+            self.m.addConstr( self.q[s] <= sum1)
 
     def add_constraints_binary(self):
         for i in range(self.clone_tree.n_nodes):
             delta_i = self.clone_tree.get_children_arcs(self.clone_tree.nodes[i])
             if len(delta_i) <= 2:
-                sum = 0
+                sum1 = 0
                 for s in range(self.clone_tree.n_sites):
-                    sum += self.l[i,s]
-                self.m.addConstr(sum  == 1)
+                    sum1 += self.l[i,s]
+                self.m.addConstr(sum1  == 1)
             else:
                 for s in range(self.clone_tree.n_sites):
-                    sum = 0
+                    sum1 = 0
                     for t in range(self.clone_tree.n_sites):
-                        sum += self.g[s,t,i]
+                        sum1 += self.g[s,t,i]
                         for ij in delta_i:
-                            sum += self.g[s,t,self.node_edge_index[ij]]
-                    self.m.addConstr(sum >= 2 * self.l[i,s])
+                            sum1 += self.g[s,t,self.node_edge_index[ij]]
+                    self.m.addConstr(sum1 >= 2 * self.l[i,s])
 
     def add_primary_site_constraints(self):
         self.m.addConstr(self.l[self.node_edge_index[clone_tree.root], self.site_index[clone_tree.primary_site]] == 1)
-        sum = 0
+        sum1 = 0
         for s in range(self.clone_tree.n_sites):
-            sum += self.g[s, self.site_index[clone_tree.primary_site], self.node_edge_index[clone_tree.root]]
-        self.m.addConstr(sum == 0)
+            sum1 += self.g[s, self.site_index[clone_tree.primary_site], self.node_edge_index[clone_tree.root]]
+        self.m.addConstr(sum1 == 0)
 
     def set_optimization_function(self):
         sum1 = 0
