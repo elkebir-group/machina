@@ -80,6 +80,7 @@ Simulation::~Simulation()
   delete _pMutations;
   delete _pAnatomicalSite;
   delete _pCloneT;
+  delete _pSampleProportions;
   
   delete _pSampleProportionsTT;
   delete _pMutationsTT;
@@ -349,7 +350,18 @@ void Simulation::updateAnatomicalSiteFactors()
   // this is calculating 1 - N / K for each site
   // and updates the population record
   
+  // 1. Recreate site factors for the current number of sites
   _anatomicalSiteFactors = AnatomicalSiteFactorVector(_nrAnatomicalSites, AnatomicalSiteMap());
+  
+  // 2. Add these to synchronize the parallel arrays!
+  if (_isActiveAnatomicalSite.size() < _nrAnatomicalSites) {
+      _isActiveAnatomicalSite.resize(_nrAnatomicalSites, false);
+  }
+  
+  if (_extantCellsByDrivers.size() < _nrAnatomicalSites) {
+      _extantCellsByDrivers.resize(_nrAnatomicalSites);
+  }
+
   _nrActiveAnatomicalSites = 0;
   for (int s = 0; s < _nrAnatomicalSites; ++s)
   {
@@ -517,6 +529,7 @@ int Simulation::getTargetAnatomicalSite(int s)
     _extantCellsByDrivers.push_back(std::map<IntSet, CellVector>());
     _seedingCells.push_back(CellVector());
     _isActiveAnatomicalSite.push_back(false);
+    _anatomicalSiteFactors.push_back(std::map<IntSet, double>());
     ++_nrAnatomicalSites;
   }
 
@@ -639,20 +652,19 @@ bool Simulation::simulate(bool verbose)
     updateAnatomicalSiteFactors();
     
     // divide and mutate
-    ClonalComposition newExtantCellsByDrivers;
+    ClonalComposition newExtantCellsByDrivers(_nrAnatomicalSites);
 
     int newNrExtantCells = 0;
     for (int s = 0; s < _nrAnatomicalSites; ++s)
     {
-      newExtantCellsByDrivers.push_back(std::map<IntSet, CellVector>());
-      std::map<IntSet, CellVector>& newExtantCellsByDrivers_s = newExtantCellsByDrivers.back();
-      
+      std::map<IntSet, CellVector>& newExtantCellsByDrivers_s = newExtantCellsByDrivers[s];
+
       for (auto& kv : _extantCellsByDrivers[s])
       {
         const IntSet& X = kv.first;
         assert(_anatomicalSiteFactors[s].count(X) == 1);
         double logisticFactor = _anatomicalSiteFactors[s][X];
-        
+
         CellVector& newExtantCellsByDrivers_sX = newExtantCellsByDrivers_s[X];
         newExtantCellsByDrivers_sX.reserve(_K * X.size());
         

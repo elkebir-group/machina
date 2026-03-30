@@ -35,6 +35,7 @@ Cell::Outcome Cell::performGeneration(double logisticFactor,
    */
   
   std::uniform_real_distribution<> unif(0, 1);
+  logisticFactor = std::max(0.0, std::min(logisticFactor, 1.0));
 
   const double s_0 = 0.1 * logisticFactor;
   
