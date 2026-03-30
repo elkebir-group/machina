@@ -168,7 +168,7 @@ bool Simulation::simulateReadCounts()
       double new_sum = 0;
       for (Node v : leavesPerAnatomicalSite[s])
       {
-        if ((draw[v] / sum) >= 0.1)
+        if ((draw[v] / sum) >= (1. / _targetCoverage))
         {
           (*_pSampleProportions)[v][p] = draw[v];
           new_sum += draw[v];
@@ -203,7 +203,7 @@ bool Simulation::simulateReadCounts()
         int coverage = poisson(g_rng);
         
         // if freq < 0.1 then zero out
-        if (_freq[s][p][i] < 0.1)
+        if (_freq[s][p][i] < (1. / _targetCoverage))
         {
           _freq[s][p][i] = 0;
         }
